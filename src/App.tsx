@@ -92,7 +92,7 @@ function App() {
         });
       });
     });
-  }, []);
+  }, [isInGame]);
 
   // 2. Poll Room States at 15 FPS (approx every 66ms) to keep React UI reactive and lightweight
   useEffect(() => {

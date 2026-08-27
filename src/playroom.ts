@@ -18,6 +18,7 @@ export interface GameState {
 export const initPlayroom = async (roomCode?: string) => {
   try {
     const opts: any = {
+      gameId: "hexaguys",
       skipLobby: true,
       discord: false,
     };

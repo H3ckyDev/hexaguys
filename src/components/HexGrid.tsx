@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { playBreakSound } from "../utils/sounds";
 
 export const HEX_RADIUS = 1.0;
-const STEP_DELAY = 2000; // 2.0 seconds delay before tile falls
+const STEP_DELAY = 1000; // 1.0 seconds delay before tile falls
 
 interface HexTileProps {
   id: string;
