@@ -164,36 +164,64 @@ interface HexGridProps {
 
 export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
   const [tiles, setTiles] = useState<any[]>([]);
+  const isLobby = gameStatus === "LOBBY";
+  const floorDistance = 4.5;
+  const topFloorY = (floorsCount - 1) * floorDistance;
 
   useEffect(() => {
     const list: any[] = [];
-    const floorDistance = 4.5;
-    const numFloors = Math.max(2, Math.min(8, floorsCount));
+    const rad = mapId === "tower" ? 3 : 4; // 37 tiles for tower, 61 tiles for classic
 
-    // Full hexagon radius for complete floor density
-    const rad = mapId === "tower" ? 3 : 4; // 37 tiles for tower, 61 tiles for classic/hourglass
-
-    for (let f = 0; f < numFloors; f++) {
-      // Top floor (f = 0) is at highest elevation, bottom floor at Y = 0
-      const floorY = (numFloors - 1 - f) * floorDistance;
-
+    if (isLobby) {
+      // IN LOBBY: Exactly 1 single wide floor at top elevation
+      const floorY = topFloorY;
       for (let q = -rad; q <= rad; q++) {
         const r1 = Math.max(-rad, -q - rad);
         const r2 = Math.min(rad, -q + rad);
         for (let r = r1; r <= r2; r++) {
           const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
           const z = HEX_RADIUS * 1.5 * r;
-          const id = `tile_${f}_${q}_${r}`;
-          list.push({ id, position: [x, floorY, z], floor: f });
+          const id = `tile_lobby_${q}_${r}`;
+          list.push({ id, position: [x, floorY, z], floor: 0 });
+        }
+      }
+    } else {
+      // IN MATCH: Load all N floors
+      const numFloors = Math.max(2, Math.min(8, floorsCount));
+      for (let f = 0; f < numFloors; f++) {
+        const floorY = (numFloors - 1 - f) * floorDistance;
+        for (let q = -rad; q <= rad; q++) {
+          const r1 = Math.max(-rad, -q - rad);
+          const r2 = Math.min(rad, -q + rad);
+          for (let r = r1; r <= r2; r++) {
+            const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
+            const z = HEX_RADIUS * 1.5 * r;
+            const id = `tile_${f}_${q}_${r}`;
+            list.push({ id, position: [x, floorY, z], floor: f });
+          }
         }
       }
     }
 
     setTiles(list);
-  }, [mapId, floorsCount]);
+  }, [mapId, floorsCount, isLobby, topFloorY]);
+
+  // 6 perimeter barrier walls for the lobby so NOBODY can fall off
+  const lobbyWalls = [0, 1, 2, 3, 4, 5].map((i) => {
+    const angle = (i * Math.PI) / 3 + Math.PI / 6;
+    const dist = 6.8;
+    const x = Math.cos(angle) * dist;
+    const z = Math.sin(angle) * dist;
+    return {
+      id: `wall_${i}`,
+      position: [x, topFloorY + 1.5, z] as [number, number, number],
+      rotation: [0, -angle + Math.PI / 2, 0] as [number, number, number],
+    };
+  });
 
   return (
     <group>
+      {/* Floor tiles */}
       {tiles.map((tile) => (
         <HexTile
           key={tile.id}
@@ -205,6 +233,46 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
           gameStatus={gameStatus}
         />
       ))}
+
+      {/* Safety Glass Barrier Walls in LOBBY (Nobody can fall off) */}
+      {isLobby && (
+        <group>
+          {lobbyWalls.map((w) => (
+            <RigidBody
+              key={w.id}
+              type="fixed"
+              position={w.position}
+              rotation={w.rotation}
+              friction={0}
+              restitution={0.2}
+            >
+              {/* Sleek Energy Barrier Glass */}
+              <mesh castShadow receiveShadow>
+                <boxGeometry args={[7.8, 3.2, 0.3]} />
+                <meshStandardMaterial
+                  color="#38bdf8"
+                  transparent
+                  opacity={0.2}
+                  roughness={0.1}
+                  metalness={0.8}
+                  emissive="#0284c7"
+                  emissiveIntensity={0.3}
+                />
+              </mesh>
+              {/* Glowing Top Rail */}
+              <mesh position={[0, 1.6, 0]}>
+                <boxGeometry args={[7.85, 0.12, 0.35]} />
+                <meshStandardMaterial
+                  color="#38bdf8"
+                  emissive="#38bdf8"
+                  emissiveIntensity={1.5}
+                  roughness={0.2}
+                />
+              </mesh>
+            </RigidBody>
+          ))}
+        </group>
+      )}
     </group>
   );
 }
