@@ -1,0 +1,254 @@
+import { useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+
+interface CharacterModelProps {
+  type: "robot" | "ninja" | "astronaut" | "alien";
+  color: string;
+  isMoving: boolean;
+  isGrounded: boolean;
+  isRunning?: boolean;
+}
+
+export function CharacterModel({
+  type,
+  color,
+  isMoving,
+  isGrounded,
+  isRunning = false,
+}: CharacterModelProps) {
+  // Anim refs
+  const leftArmRef = useRef<THREE.Group>(null);
+  const rightArmRef = useRef<THREE.Group>(null);
+  const leftLegRef = useRef<THREE.Group>(null);
+  const rightLegRef = useRef<THREE.Group>(null);
+  const bodyRef = useRef<THREE.Group>(null);
+  const headRef = useRef<THREE.Group>(null);
+
+  const animTime = useRef(0);
+
+  useFrame((_, delta) => {
+    // 1. Walking vs Running animation
+    if (isMoving && isGrounded) {
+      const speedMultiplier = isRunning ? 14.0 : 7.5;
+      animTime.current += delta * speedMultiplier;
+      
+      const swingAmp = isRunning ? 0.75 : 0.45;
+      const swing = Math.sin(animTime.current) * swingAmp;
+      
+      if (leftLegRef.current) leftLegRef.current.rotation.x = swing;
+      if (rightLegRef.current) rightLegRef.current.rotation.x = -swing;
+      if (leftArmRef.current) leftArmRef.current.rotation.x = -swing;
+      if (rightArmRef.current) rightArmRef.current.rotation.x = swing;
+
+      // Bounce & Sprint forward lean
+      if (bodyRef.current) {
+        const bounceAmp = isRunning ? 0.12 : 0.05;
+        bodyRef.current.position.y = Math.abs(Math.sin(animTime.current * 2)) * bounceAmp;
+        
+        // Lean forward into sprint
+        const targetPitch = isRunning ? -0.2 : 0;
+        bodyRef.current.rotation.x = THREE.MathUtils.lerp(bodyRef.current.rotation.x, targetPitch, delta * 10);
+      }
+    } else {
+      // Return slowly to idle
+      animTime.current = 0;
+      const lerpSpeed = delta * 10;
+      
+      if (leftLegRef.current) leftLegRef.current.rotation.x = THREE.MathUtils.lerp(leftLegRef.current.rotation.x, 0, lerpSpeed);
+      if (rightLegRef.current) rightLegRef.current.rotation.x = THREE.MathUtils.lerp(rightLegRef.current.rotation.x, 0, lerpSpeed);
+      if (leftArmRef.current) leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, 0, lerpSpeed);
+      if (rightArmRef.current) rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, lerpSpeed);
+      if (bodyRef.current) {
+        bodyRef.current.position.y = THREE.MathUtils.lerp(bodyRef.current.position.y, 0, lerpSpeed);
+        bodyRef.current.rotation.x = THREE.MathUtils.lerp(bodyRef.current.rotation.x, 0, lerpSpeed);
+      }
+    }
+
+    // 2. Jumping pose
+    if (!isGrounded) {
+      const lerpSpeed = delta * 8;
+      // Lift arms up in panic/joy
+      if (leftArmRef.current) leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, -Math.PI * 0.8, lerpSpeed);
+      if (rightArmRef.current) rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, -Math.PI * 0.8, lerpSpeed);
+      // Legs separate slightly
+      if (leftLegRef.current) leftLegRef.current.rotation.z = THREE.MathUtils.lerp(leftLegRef.current.rotation.z, -0.15, lerpSpeed);
+      if (rightLegRef.current) rightLegRef.current.rotation.z = THREE.MathUtils.lerp(rightLegRef.current.rotation.z, 0.15, lerpSpeed);
+    } else {
+      const lerpSpeed = delta * 8;
+      if (leftLegRef.current) leftLegRef.current.rotation.z = THREE.MathUtils.lerp(leftLegRef.current.rotation.z, 0, lerpSpeed);
+      if (rightLegRef.current) rightLegRef.current.rotation.z = THREE.MathUtils.lerp(rightLegRef.current.rotation.z, 0, lerpSpeed);
+    }
+  });
+
+  // Material specifications based on types
+  const mainMaterial = (
+    <meshStandardMaterial
+      color={color}
+      roughness={type === "robot" || type === "astronaut" ? 0.2 : 0.7}
+      metalness={type === "robot" ? 0.8 : type === "astronaut" ? 0.1 : 0.0}
+    />
+  );
+
+  return (
+    <group ref={bodyRef} position={[0, -0.4, 0]}>
+      {/* 1. MAIN BODY COB */}
+      <mesh castShadow receiveShadow position={[0, 0.6, 0]}>
+        <boxGeometry args={[0.55, 0.55, 0.35]} />
+        {mainMaterial}
+      </mesh>
+
+      {/* Backpack for Astronaut */}
+      {type === "astronaut" && (
+        <mesh castShadow position={[0, 0.6, -0.22]}>
+          <boxGeometry args={[0.35, 0.4, 0.15]} />
+          <meshStandardMaterial color="#e2e8f0" roughness={0.3} />
+        </mesh>
+      )}
+
+      {/* Ninja belt */}
+      {type === "ninja" && (
+        <mesh castShadow position={[0, 0.45, 0]}>
+          <boxGeometry args={[0.57, 0.08, 0.37]} />
+          <meshStandardMaterial color="#ef4444" roughness={0.6} />
+        </mesh>
+      )}
+
+      {/* Robot screen chest */}
+      {type === "robot" && (
+        <mesh castShadow position={[0, 0.6, 0.185]}>
+          <boxGeometry args={[0.3, 0.2, 0.02]} />
+          <meshStandardMaterial color="#0284c7" emissive="#0284c7" emissiveIntensity={0.6} />
+        </mesh>
+      )}
+
+      {/* 2. HEAD */}
+      <group ref={headRef} position={[0, 1.05, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[0.42, 0.42, 0.42]} />
+          {mainMaterial}
+        </mesh>
+
+        {/* Robot Visor / Eyes */}
+        {type === "robot" && (
+          <>
+            <mesh position={[0, 0.08, 0.22]}>
+              <boxGeometry args={[0.3, 0.08, 0.02]} />
+              <meshStandardMaterial color="#ec4899" emissive="#ec4899" emissiveIntensity={1} />
+            </mesh>
+            {/* Antennas */}
+            <mesh position={[-0.1, 0.26, 0]}>
+              <cylinderGeometry args={[0.02, 0.02, 0.15]} />
+              <meshStandardMaterial color="#64748b" metalness={0.9} />
+            </mesh>
+            <mesh position={[0.1, 0.26, 0]}>
+              <cylinderGeometry args={[0.02, 0.02, 0.15]} />
+              <meshStandardMaterial color="#64748b" metalness={0.9} />
+            </mesh>
+          </>
+        )}
+
+        {/* Ninja Headband */}
+        {type === "ninja" && (
+          <>
+            {/* Front Band */}
+            <mesh position={[0, 0.08, 0]}>
+              <boxGeometry args={[0.44, 0.08, 0.44]} />
+              <meshStandardMaterial color="#ef4444" roughness={0.6} />
+            </mesh>
+            {/* Hanging ties in back */}
+            <mesh position={[0.08, -0.15, -0.22]} rotation={[0, 0, -0.2]}>
+              <boxGeometry args={[0.05, 0.2, 0.01]} />
+              <meshStandardMaterial color="#ef4444" />
+            </mesh>
+            <mesh position={[-0.08, -0.15, -0.22]} rotation={[0, 0, 0.2]}>
+              <boxGeometry args={[0.05, 0.2, 0.01]} />
+              <meshStandardMaterial color="#ef4444" />
+            </mesh>
+          </>
+        )}
+
+        {/* Astronaut Helmet Visor */}
+        {type === "astronaut" && (
+          <mesh position={[0, 0, 0.1]} scale={[1, 0.9, 0.9]}>
+            <sphereGeometry args={[0.22, 16, 16]} />
+            <meshStandardMaterial color="#0f172a" roughness={0.05} metalness={0.9} />
+          </mesh>
+        )}
+
+        {/* Alien 3 Eyes & Antennas */}
+        {type === "alien" && (
+          <>
+            {/* Three Eyes */}
+            <mesh position={[-0.1, 0.06, 0.2]}>
+              <sphereGeometry args={[0.06, 16, 16]} />
+              <meshBasicMaterial color="#ffffff" />
+            </mesh>
+            <mesh position={[0, 0.12, 0.2]}>
+              <sphereGeometry args={[0.06, 16, 16]} />
+              <meshBasicMaterial color="#ffffff" />
+            </mesh>
+            <mesh position={[0.1, 0.06, 0.2]}>
+              <sphereGeometry args={[0.06, 16, 16]} />
+              <meshBasicMaterial color="#ffffff" />
+            </mesh>
+            {/* Pupils */}
+            <mesh position={[-0.1, 0.06, 0.25]}>
+              <sphereGeometry args={[0.025, 8, 8]} />
+              <meshBasicMaterial color="#000000" />
+            </mesh>
+            <mesh position={[0, 0.12, 0.25]}>
+              <sphereGeometry args={[0.025, 8, 8]} />
+              <meshBasicMaterial color="#000000" />
+            </mesh>
+            <mesh position={[0.1, 0.06, 0.25]}>
+              <sphereGeometry args={[0.025, 8, 8]} />
+              <meshBasicMaterial color="#000000" />
+            </mesh>
+            {/* Alien Antennas */}
+            <mesh position={[0, 0.26, 0]}>
+              <cylinderGeometry args={[0.015, 0.015, 0.12]} />
+              <meshStandardMaterial color={color} />
+            </mesh>
+            <mesh position={[0, 0.33, 0]}>
+              <sphereGeometry args={[0.04, 8, 8]} />
+              <meshStandardMaterial color="#ec4899" emissive="#ec4899" />
+            </mesh>
+          </>
+        )}
+      </group>
+
+      {/* 3. LEFT ARM */}
+      <group ref={leftArmRef} position={[-0.38, 0.8, 0]}>
+        <mesh castShadow position={[0, -0.2, 0]}>
+          <boxGeometry args={[0.15, 0.38, 0.15]} />
+          {mainMaterial}
+        </mesh>
+      </group>
+
+      {/* 4. RIGHT ARM */}
+      <group ref={rightArmRef} position={[0.38, 0.8, 0]}>
+        <mesh castShadow position={[0, -0.2, 0]}>
+          <boxGeometry args={[0.15, 0.38, 0.15]} />
+          {mainMaterial}
+        </mesh>
+      </group>
+
+      {/* 5. LEFT LEG */}
+      <group ref={leftLegRef} position={[-0.16, 0.35, 0]}>
+        <mesh castShadow position={[0, -0.2, 0]}>
+          <boxGeometry args={[0.18, 0.38, 0.18]} />
+          {mainMaterial}
+        </mesh>
+      </group>
+
+      {/* 6. RIGHT LEG */}
+      <group ref={rightLegRef} position={[0.16, 0.35, 0]}>
+        <mesh castShadow position={[0, -0.2, 0]}>
+          <boxGeometry args={[0.18, 0.38, 0.18]} />
+          {mainMaterial}
+        </mesh>
+      </group>
+    </group>
+  );
+}

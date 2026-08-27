@@ -1,0 +1,328 @@
+import { useRef, useState, useEffect } from "react";
+import { useFrame } from "@react-three/fiber";
+import { RigidBody, RapierRigidBody, CapsuleCollider } from "@react-three/rapier";
+import { useKeyboardControls, Html } from "@react-three/drei";
+import { CharacterModel } from "./CharacterModel";
+import { playJumpSound, playFallSound } from "../utils/sounds";
+import * as THREE from "three";
+
+function shortestAngleDiff(target: number, current: number) {
+  let diff = (target - current) % (Math.PI * 2);
+  if (diff < -Math.PI) diff += Math.PI * 2;
+  if (diff > Math.PI) diff -= Math.PI * 2;
+  return diff;
+}
+
+interface PlayerBallProps {
+  player: any; // Playroom player state
+  playerIndex?: number;
+  totalPlayers?: number;
+  isLocal: boolean;
+  gameStatus: string;
+  floorsCount?: number;
+}
+
+export function PlayerBall({
+  player,
+  playerIndex = 0,
+  totalPlayers = 1,
+  isLocal,
+  gameStatus,
+  floorsCount = 3,
+}: PlayerBallProps) {
+  const rbRef = useRef<RapierRigidBody>(null);
+  const visualRef = useRef<THREE.Group>(null);
+  
+  // Calculate distinct radial spawn position to guarantee zero collider overlaps on game start
+  const total = Math.max(1, totalPlayers);
+  const angle = (playerIndex / total) * Math.PI * 2;
+  const spawnDist = total > 1 ? 2.0 : 0;
+  const spawnX = Math.cos(angle) * spawnDist;
+  const spawnZ = Math.sin(angle) * spawnDist;
+  const topFloorY = (floorsCount - 1) * 4.5;
+  const spawnY = topFloorY + 1.8;
+
+  const smoothCamTarget = useRef(new THREE.Vector3(spawnX, spawnY, spawnZ));
+  const [, getKeys] = useKeyboardControls();
+  const [lastJumpTime, setLastJumpTime] = useState(0);
+  const [isGrounded, setIsGrounded] = useState(true);
+  const [isMoving, setIsMoving] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const playerColor = player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8";
+  const playerName = player.getState("name") || player.getProfile()?.name || `Player ${player.id.slice(0, 3)}`;
+  
+  // Fetch skin from playroom state (no default skin initially)
+  const skinType = player.getState("skin");
+
+  // Reset player position safely on countdown start
+  useEffect(() => {
+    if (isLocal && skinType && gameStatus === "COUNTDOWN") {
+      smoothCamTarget.current.set(spawnX, spawnY, spawnZ);
+      player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
+      player.setState("vel", { x: 0, y: 0, z: 0 });
+      player.setState("isAlive", true);
+      player.setState("isMoving", false);
+      player.setState("isRunning", false);
+      
+      if (rbRef.current) {
+        rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
+        rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+    }
+  }, [gameStatus, isLocal, player, skinType, spawnX, spawnY, spawnZ]);
+
+  const userData = { type: "player", playerId: player.id };
+
+  useFrame((state) => {
+    // 1. LOCAL PLAYER CONTROLLER
+    if (isLocal) {
+      if (!rbRef.current || !visualRef.current) return;
+
+      const keys = getKeys();
+      const linvel = rbRef.current.linvel();
+      const translation = rbRef.current.translation();
+      const isAlive = player.getState("isAlive") !== false;
+
+      // Ground check based on Y velocity and translation height
+      const grounded = Math.abs(linvel.y) < 0.35;
+      setIsGrounded(grounded);
+
+      if (isAlive) {
+        // Keyboard inputs (only active during PLAYING status)
+        let vx = 0;
+        let vz = 0;
+        
+        // Walk (3.8) by default; Sprint (6.8) when holding Shift
+        const isSprinting = Boolean(keys.sprint);
+        const speed = isSprinting ? 6.8 : 3.8;
+
+        // Only accept keyboard inputs when game is PLAYING and current window is focused
+        const hasFocus = typeof document === "undefined" || document.hasFocus();
+
+        if (gameStatus === "PLAYING" && hasFocus) {
+          if (keys.forward) vz -= speed;
+          if (keys.backward) vz += speed;
+          if (keys.left) vx -= speed;
+          if (keys.right) vx += speed;
+
+          // Normalize diagonal movement so player doesn't move faster diagonally
+          if (vx !== 0 && vz !== 0) {
+            vx *= 0.7071;
+            vz *= 0.7071;
+          }
+        }
+
+        // Jump physics & Sound (only active during PLAYING status when focused)
+        let vy = linvel.y;
+        if (gameStatus === "PLAYING" && hasFocus && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
+          vy = 8.0; // Balanced jump impulse
+          setLastJumpTime(Date.now());
+          playJumpSound(); // Play procedural jump synth
+        }
+
+        // Apply movement vector
+        if (rbRef.current) {
+          if (gameStatus === "PLAYING") {
+            rbRef.current.setLinvel({ x: vx, y: vy, z: vz }, true);
+          } else if (gameStatus === "COUNTDOWN") {
+            // Strictly anchor at first (top) floor spawn coordinates during countdown
+            rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
+            player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
+            player.setState("vel", { x: 0, y: 0, z: 0 });
+            player.setState("isAlive", true);
+          }
+        }
+
+        // Turn character mesh in direction of movement
+        const moving = Math.abs(vx) > 0.1 || Math.abs(vz) > 0.1;
+        const running = moving && isSprinting;
+        setIsMoving(moving);
+        setIsRunning(running);
+        player.setState("isMoving", moving);
+        player.setState("isRunning", running);
+
+        if (moving) {
+          const targetAngle = Math.atan2(vx, vz);
+          const diff = shortestAngleDiff(targetAngle, visualRef.current.rotation.y);
+          // Smooth rotation along shortest angle path
+          visualRef.current.rotation.y += diff * 0.22;
+
+          // Dynamic banking / tilt into turn
+          const targetTilt = -diff * 0.12;
+          visualRef.current.rotation.z = THREE.MathUtils.lerp(
+            visualRef.current.rotation.z,
+            targetTilt,
+            0.15
+          );
+        } else {
+          // Reset tilt when standing still
+          visualRef.current.rotation.z = THREE.MathUtils.lerp(
+            visualRef.current.rotation.z,
+            0,
+            0.15
+          );
+        }
+
+        // Void fall check
+        if (translation.y < -8) {
+          player.setState("isAlive", false);
+          player.setState("isMoving", false);
+          player.setState("vel", { x: 0, y: 0, z: 0 });
+          rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rbRef.current.setTranslation({ x: 0, y: -20, z: 0 }, true);
+          playFallSound(); // Play procedural death sweep
+        } else {
+          // Broadcast position & velocity
+          player.setState("pos", { x: translation.x, y: translation.y, z: translation.z });
+          player.setState("vel", { x: vx, y: vy, z: vz });
+        }
+
+        if (gameStatus === "ROUND_OVER") {
+          // Despawn local player from active field on round end
+          rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rbRef.current.setTranslation({ x: 0, y: -50, z: 0 }, true);
+          smoothCamTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+          state.camera.position.set(
+            smoothCamTarget.current.x,
+            smoothCamTarget.current.y + 15,
+            smoothCamTarget.current.z + 18
+          );
+          state.camera.lookAt(0, 0, 0);
+        } else {
+          // Stabilized gimbal-style camera follow
+          smoothCamTarget.current.lerp(
+            new THREE.Vector3(translation.x, translation.y, translation.z),
+            0.08
+          );
+
+          state.camera.position.set(
+            smoothCamTarget.current.x,
+            smoothCamTarget.current.y + 6.8,
+            smoothCamTarget.current.z + 8.8
+          );
+          state.camera.lookAt(
+            smoothCamTarget.current.x,
+            smoothCamTarget.current.y + 0.5,
+            smoothCamTarget.current.z
+          );
+        }
+      } else {
+        // Smooth spectate camera
+        smoothCamTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+        state.camera.position.set(
+          smoothCamTarget.current.x,
+          smoothCamTarget.current.y + 15,
+          smoothCamTarget.current.z + 18
+        );
+        state.camera.lookAt(0, 0, 0);
+      }
+    }
+    // 2. REMOTE PLAYER INTERPOLATION
+    else {
+      const netPos = player.getState("pos");
+      const netVel = player.getState("vel");
+      const netMoving = player.getState("isMoving") || false;
+      const netRunning = player.getState("isRunning") || false;
+      const isAlive = player.getState("isAlive") !== false;
+
+      setIsMoving(netMoving);
+      setIsRunning(netRunning);
+
+      if (!isAlive) {
+        if (rbRef.current) {
+          rbRef.current.setTranslation({ x: 0, y: -50, z: 0 }, true);
+        }
+        return;
+      }
+
+      if (gameStatus === "COUNTDOWN") {
+        if (rbRef.current) {
+          rbRef.current.setNextKinematicTranslation({
+            x: spawnX,
+            y: spawnY,
+            z: spawnZ,
+          });
+        }
+        setIsMoving(false);
+        setIsRunning(false);
+        setIsGrounded(true);
+        return;
+      }
+
+      if (netPos && rbRef.current) {
+        const nextX = THREE.MathUtils.lerp(rbRef.current.translation().x, netPos.x, 0.25);
+        const nextY = THREE.MathUtils.lerp(rbRef.current.translation().y, netPos.y, 0.25);
+        const nextZ = THREE.MathUtils.lerp(rbRef.current.translation().z, netPos.z, 0.25);
+        
+        rbRef.current.setNextKinematicTranslation({
+          x: nextX,
+          y: nextY,
+          z: nextZ,
+        });
+
+        // Set grounded based on remote Y velocity
+        setIsGrounded(netVel ? Math.abs(netVel.y) < 0.35 : true);
+      }
+
+      // Smooth rotation for remote players
+      if (netVel && visualRef.current && (Math.abs(netVel.x) > 0.1 || Math.abs(netVel.z) > 0.1)) {
+        const targetAngle = Math.atan2(netVel.x, netVel.z);
+        const diff = shortestAngleDiff(targetAngle, visualRef.current.rotation.y);
+        visualRef.current.rotation.y += diff * 0.22;
+      }
+    }
+  });
+
+  const isAlive = player.getState("isAlive") !== false;
+  const shouldBeVisible = isAlive && gameStatus !== "ROUND_OVER" && gameStatus !== "LOBBY";
+  if (!skinType || gameStatus === "LOBBY") return null; // Block spawn in lobby or if skin not chosen!
+
+  return (
+    <group>
+      <RigidBody
+        ref={rbRef}
+        type={isLocal ? (gameStatus === "COUNTDOWN" ? "fixed" : "dynamic") : "kinematicPosition"}
+        colliders={false} // Custom capsule collider
+        position={[spawnX, spawnY, spawnZ]}
+        enabledTranslations={[true, true, true]}
+        enabledRotations={[false, true, false]} // Lock rotation in X and Z! Character stays upright.
+        userData={userData}
+        linearDamping={0.4}
+        angularDamping={1.0}
+        ccd={true}
+      >
+        {/* Capsule collider perfectly aligned with feet and head; zero friction prevents snagging on tile seams */}
+        <CapsuleCollider args={[0.32, 0.30]} position={[0, 0.20, 0]} friction={0} restitution={0} />
+
+        {/* Character Visual Wrapper (Hidden when eliminated or when round is over) */}
+        <group ref={visualRef} visible={shouldBeVisible}>
+          <CharacterModel
+            type={skinType}
+            color={playerColor}
+            isMoving={isMoving}
+            isGrounded={isGrounded}
+            isRunning={isRunning}
+          />
+        </group>
+
+        {/* Floating HTML Name tag overlay */}
+        {shouldBeVisible && (
+          <Html distanceFactor={10} position={[0, 1.4, 0]} center>
+            <div
+              className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow bg-slate-900/80 border border-slate-700 whitespace-nowrap flex items-center gap-1.5"
+              style={{ borderLeftColor: playerColor, borderLeftWidth: "4px" }}
+            >
+              <span>{playerName}</span>
+              <span className="text-[9px] text-slate-400 capitalize bg-slate-800 px-1 rounded">
+                {skinType}
+              </span>
+            </div>
+          </Html>
+        )}
+      </RigidBody>
+    </group>
+  );
+}
