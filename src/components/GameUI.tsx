@@ -192,7 +192,7 @@ export function GameUI({
   ];
 
   return (
-    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-5 md:p-7 z-10 select-none font-sans">
+    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-5 md:p-7 z-30 select-none font-sans">
       {/* TOP DYNAMIC ISLAND BAR */}
       <div className="flex justify-between items-start pointer-events-auto gap-4">
         {/* Game Brand & Action Pill */}
@@ -235,7 +235,6 @@ export function GameUI({
             <h2 className="text-[11px] font-bold tracking-wider uppercase text-white/60">
               Jugadores ({players.length})
             </h2>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse inline-block" />
           </div>
           <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
             {players.map((p) => {
@@ -279,11 +278,11 @@ export function GameUI({
         </div>
       </div>
 
-      {/* MIDDLE OVERLAYS / MODALS */}
-      <div className="flex-1 flex items-center justify-center pointer-events-auto my-4">
-        {/* Settings Menu Modal */}
+      {/* MODALES Y CAPAS SUPERPUESTAS */}
+      <div className="flex-1 flex items-center justify-center pointer-events-auto my-4 relative z-40">
+        {/* Modal de Ajustes */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 pointer-events-auto p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] pointer-events-auto p-4">
             <div className="ios-glass-panel p-7 md:p-8 rounded-[34px] flex flex-col gap-6 max-w-sm w-full text-white animate-in fade-in zoom-in duration-200">
               <div className="text-center">
                 <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-white/10 flex items-center justify-center text-2xl ring-1 ring-white/20 shadow-inner">
@@ -436,9 +435,9 @@ export function GameUI({
           </div>
         )}
 
-        {/* Interactive Floating 3D Lobby UI - Fixed at Bottom Center */}
+        {/* Interfaz flotante del Lobby interactivo - Fija en el centro inferior */}
         {gameStatus === "LOBBY" && !showSettings && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30 pointer-events-none w-full max-w-xl px-4 animate-in slide-in-from-bottom duration-300">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-40 pointer-events-none w-full max-w-xl px-4 animate-in slide-in-from-bottom duration-300">
             {/* Floating Customizer Glass Panel (Opens upwards on demand) */}
             {showLobbyCustomizer && (
               <div className="ios-glass-panel p-5 md:p-6 rounded-[32px] flex flex-col gap-4 max-w-lg w-full text-white pointer-events-auto shadow-2xl animate-in zoom-in-95 duration-200 mb-2 border border-white/20">

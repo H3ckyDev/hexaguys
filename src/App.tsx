@@ -378,17 +378,28 @@ function App() {
   return (
     <KeyboardControls map={keyboardMap}>
       <div className="w-full h-full relative overflow-hidden bg-[#0d0e12]">
-        {/* HUD de Rendimiento en una sola línea (FPS y Ping en la esquina inferior derecha) */}
+        {/* 1. Escena 3D WebGL Canvas (Capa base de fondo) */}
+        <GameScene
+          players={players}
+          brokenTiles={brokenTiles}
+          onStepTile={handleStepTile}
+          gameStatus={gameStatus}
+          mapId={mapId}
+          floorsCount={floorsCount}
+          showPlayerPing={showPlayerPing}
+        />
+
+        {/* 2. HUD de Rendimiento en una sola línea (FPS y Ping en la esquina inferior derecha) */}
         <PerformanceHUD showFps={showFps} showPing={showPing} />
 
-        {/* Chat Multijugador en tiempo real con diseño iOS 26 (Esquina inferior izquierda) */}
+        {/* 3. Chat Multijugador en tiempo real con diseño iOS 26 (Esquina inferior izquierda) */}
         <ChatOverlay
           messages={messages}
           onSendMessage={handleSendMessage}
           localPlayerId={myPlayer()?.id}
         />
 
-        {/* Interfaz 2D React Superpuesta */}
+        {/* 4. Interfaz 2D React Superpuesta y Modales (Siempre por encima de la escena 3D) */}
         <GameUI
           players={players}
           gameStatus={gameStatus}
@@ -410,17 +421,6 @@ function App() {
           onTogglePlayerPing={() => setShowPlayerPing((prev) => !prev)}
           volume={volume}
           onVolumeChange={handleVolumeChange}
-        />
-
-        {/* Escena 3D WebGL Canvas */}
-        <GameScene
-          players={players}
-          brokenTiles={brokenTiles}
-          onStepTile={handleStepTile}
-          gameStatus={gameStatus}
-          mapId={mapId}
-          floorsCount={floorsCount}
-          showPlayerPing={showPlayerPing}
         />
       </div>
     </KeyboardControls>

@@ -301,9 +301,9 @@ export function PlayerBall({
           />
         </group>
 
-        {/* Etiqueta flotante con nombre y burbuja de chat 3D */}
+        {/* Etiqueta flotante con nombre y burbuja de chat 3D (con zIndexRange bajo para quedar detrás de cualquier modal) */}
         {shouldBeVisible && (
-          <Html distanceFactor={10} position={[0, 1.5, 0]} center>
+          <Html distanceFactor={10} position={[0, 1.5, 0]} center zIndexRange={[10, 0]}>
             <div className="flex flex-col items-center pointer-events-none select-none">
               {/* Burbuja de diálogo 3D flotante */}
               {isChatActive && (
