@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { RigidBody, RapierRigidBody, CapsuleCollider } from "@react-three/rapier";
 import { useKeyboardControls, Html } from "@react-three/drei";
 import { CharacterModel } from "./CharacterModel";
-import { playJumpSound, playFallSound } from "../utils/sounds";
+import { playJumpSound, playFallSound, playScoreNotificationSound } from "../utils/sounds";
 import { RPC } from "playroomkit";
 import * as THREE from "three";
 
@@ -51,6 +51,9 @@ export function PlayerBall({
   const [isGrounded, setIsGrounded] = useState(true);
   const [isMoving, setIsMoving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [scoreNotification, setScoreNotification] = useState<{ amount: number; id: string; timestamp: number } | null>(null);
+  const lastScoreNotificationId = useRef<string | null>(null);
+  const scoreNotificationTimeout = useRef<number | null>(null);
 
   const playerColor = player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8";
   const playerName = player.getState("name") || player.getProfile()?.name || `Player ${player.id.slice(0, 3)}`;
@@ -278,7 +281,12 @@ export function PlayerBall({
           player.setState("vel", { x: vx, y: vy, z: vz });
         }
 
-        if (gameStatus === "ROUND_OVER") {
+        const scoreEvent = player.getState("scoreNotification") as { timestamp?: number } | undefined;
+        const hasActiveScoreNotification = Boolean(
+          scoreEvent?.timestamp && Date.now() - scoreEvent.timestamp < 2000,
+        );
+
+        if (gameStatus === "ROUND_OVER" && !scoreNotification && !hasActiveScoreNotification) {
           rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
           rbRef.current.setTranslation({ x: 0, y: -50, z: 0 }, true);
           smoothCamTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.05);
@@ -359,7 +367,33 @@ export function PlayerBall({
   });
 
   const isAlive = player.getState("isAlive") !== false;
-  const shouldBeVisible = isAlive && gameStatus !== "ROUND_OVER";
+  const shouldBeVisible = isAlive && (gameStatus !== "ROUND_OVER" || Boolean(scoreNotification));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const notification = player.getState("scoreNotification") as { amount: number; id: string; timestamp: number } | undefined;
+      if (!notification || notification.id === lastScoreNotificationId.current) return;
+
+      lastScoreNotificationId.current = notification.id;
+      setScoreNotification(notification);
+      playScoreNotificationSound();
+
+      if (scoreNotificationTimeout.current !== null) {
+        window.clearTimeout(scoreNotificationTimeout.current);
+      }
+      scoreNotificationTimeout.current = window.setTimeout(() => {
+        setScoreNotification(null);
+        scoreNotificationTimeout.current = null;
+      }, 2000);
+    }, 100);
+
+    return () => {
+      clearInterval(interval);
+      if (scoreNotificationTimeout.current !== null) {
+        window.clearTimeout(scoreNotificationTimeout.current);
+      }
+    };
+  }, [player]);
 
   // Comprobar si hay un mensaje de chat reciente para mostrar en la burbuja 3D (duración de 4.5s)
   const lastChat = player.getState("lastChat");
@@ -400,6 +434,15 @@ export function PlayerBall({
         {shouldBeVisible && (
           <Html distanceFactor={10} position={[0, 1.5, 0]} center zIndexRange={[10, 0]}>
             <div className="flex flex-col items-center pointer-events-none select-none">
+              {scoreNotification && (
+                <div
+                  key={scoreNotification.id}
+                  className="mb-1 text-2xl font-black text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] animate-bounce"
+                >
+                  +{scoreNotification.amount}
+                </div>
+              )}
+
               {/* Burbuja de diálogo 3D flotante */}
               {isChatActive && (
                 <div className="mb-2 px-3 py-1.5 rounded-2xl bg-white/95 text-slate-900 text-xs font-black shadow-2xl border-2 border-sky-400 max-w-[200px] text-center break-words animate-in zoom-in-90 duration-150 relative">
