@@ -60,6 +60,7 @@ export function GameUI({
   onVolumeChange,
 }: GameUIProps) {
   const alivePlayers = players.filter((p) => p.getState("isAlive") !== false);
+  const activePlayers = players.filter((p) => !p.getState("isAfk"));
   const host = isHost();
   const localPlayer = myPlayer();
   const [showCustomizerInEnd, setShowCustomizerInEnd] = useState(false);
@@ -603,18 +604,29 @@ export function GameUI({
               </div>
 
               {host ? (
-                <button
-                  onClick={() => {
-                    if (document.activeElement instanceof HTMLElement) {
-                      document.activeElement.blur();
-                    }
-                    onStartGame();
-                  }}
-                  className="ios-btn-primary px-6 py-2.5 rounded-full text-xs uppercase font-extrabold tracking-wider text-white shadow-2xl flex items-center gap-2 cursor-pointer active:scale-95 hover:scale-102 transition-all ring-2 ring-sky-400/40"
-                >
-                  <span className="text-sm">🚀</span>
-                  <span>Comenzar Partida</span>
-                </button>
+                activePlayers.length >= 2 ? (
+                  <button
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                      }
+                      onStartGame();
+                    }}
+                    className="ios-btn-primary px-6 py-2.5 rounded-full text-xs uppercase font-extrabold tracking-wider text-white shadow-2xl flex items-center gap-2 cursor-pointer active:scale-95 hover:scale-102 transition-all ring-2 ring-sky-400/40"
+                  >
+                    <span className="text-sm">🚀</span>
+                    <span>Comenzar Partida</span>
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="px-5 py-2.5 rounded-full text-xs font-bold text-white/50 bg-white/10 border border-white/15 shadow-lg flex items-center gap-2 cursor-not-allowed"
+                    title="Se requieren al menos 2 jugadores activos para comenzar la partida"
+                  >
+                    <span>👥</span>
+                    <span>Mínimo 2 Activos ({activePlayers.length}/2)</span>
+                  </button>
+                )
               ) : (
                 <div className="ios-pill px-5 py-2 rounded-full text-amber-300 text-xs font-semibold flex items-center gap-2 shadow-xl animate-pulse">
                   <span>⏳</span>
@@ -817,12 +829,22 @@ export function GameUI({
             {/* Action Buttons */}
             <div className="w-full flex flex-col gap-2 pt-1">
               {host && (
-                <button
-                  onClick={onStartGame}
-                  className="ios-btn-primary w-full py-3.5 text-white font-bold rounded-2xl uppercase tracking-wider text-xs cursor-pointer shadow-lg"
-                >
-                  🚀 Jugar Siguiente Ronda
-                </button>
+                activePlayers.length >= 2 ? (
+                  <button
+                    onClick={onStartGame}
+                    className="ios-btn-primary w-full py-3.5 text-white font-bold rounded-2xl uppercase tracking-wider text-xs cursor-pointer shadow-lg"
+                  >
+                    🚀 Jugar Siguiente Ronda
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="w-full py-3.5 rounded-2xl text-xs font-bold text-white/40 bg-white/10 border border-white/10 flex items-center justify-center gap-2 cursor-not-allowed"
+                  >
+                    <span>👥</span>
+                    <span>Mínimo 2 Jugadores Activos ({activePlayers.length}/2)</span>
+                  </button>
+                )
               )}
               {host && onReturnToLobby && (
                 <button

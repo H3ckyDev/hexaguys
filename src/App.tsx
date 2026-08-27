@@ -215,9 +215,24 @@ function App() {
 
     const timer = setInterval(() => {
       const status = getState("status") || "LOBBY";
+      const activePlayers = players.filter((p) => !p.getState("isAfk"));
 
-      // A. 5-Second Countdown tick
+      // A. Contador de 5 segundos (se cancela si quedan menos de 2 jugadores activos)
       if (status === "COUNTDOWN") {
+        if (activePlayers.length < 2) {
+          setState("status", "LOBBY");
+          setState("countdown", 5);
+          RPC.call("chatMessage", {
+            id: `msg_cancel_${Date.now()}`,
+            senderId: "system",
+            senderName: "Sistema",
+            senderColor: "#f59e0b",
+            text: "⚠️ Inicio cancelado: se requieren mínimo 2 jugadores activos (no AFK).",
+            timestamp: Date.now(),
+          }, RPC.Mode.ALL);
+          return;
+        }
+
         const countVal = getState("countdown") ?? 5;
         if (countVal > 1) {
           setState("countdown", countVal - 1);
@@ -227,22 +242,22 @@ function App() {
         }
       }
 
-      // B. Game playing logic (check win/lose states)
+      // B. Lógica de partida activa
       if (status === "PLAYING" && players.length > 0) {
         const alive = players.filter((p) => p.getState("isAlive") !== false);
 
         if (alive.length === 0) {
-          // Draw: Everyone fell at the same time
+          // Empate: Todos cayeron al mismo tiempo
           setState("status", "ROUND_OVER");
           setState("winnerId", null);
         } else if (alive.length === 1 && players.length > 1) {
-          // Winner found in multiplayer
+          // Ganador en multijugador
           const winner = alive[0];
           setState("status", "ROUND_OVER");
           setState("winnerId", winner.id);
           winner.setState("score", (winner.getState("score") || 0) + 1);
         } else if (players.length === 1 && alive.length === 0) {
-          // Solo mode death
+          // Muerte en modo individual
           setState("status", "ROUND_OVER");
           setState("winnerId", null);
         }
@@ -252,18 +267,24 @@ function App() {
     return () => clearInterval(timer);
   }, [connected, players]);
 
-  // Handle game start/restart (Host only)
+  // Iniciar / reiniciar partida (Solo Anfitrión con mínimo 2 jugadores no AFK)
   const handleStartGame = () => {
     if (!isHost()) return;
 
-    // Reset player alive status directly from host
+    const activePlayers = players.filter((p) => !p.getState("isAfk"));
+    if (activePlayers.length < 2) {
+      return;
+    }
+
+    // Restablecer estados de vida y motivos de muerte
     players.forEach((p) => {
       p.setState("isAlive", true);
+      p.setState("deathReason", null);
       p.setState("isMoving", false);
       p.setState("isRunning", false);
     });
 
-    // Reset room state with 5-second countdown
+    // Reiniciar estado de la sala con contador de 5 segundos
     setState("brokenTiles", {});
     setState("winnerId", null);
     setState("countdown", 5);
