@@ -23,6 +23,7 @@ function App() {
     : null;
 
   const [isInGame, setIsInGame] = useState<boolean>(Boolean(initialRoom));
+  const [roomCodeToJoin, setRoomCodeToJoin] = useState<string | null>(initialRoom);
   const [connected, setConnected] = useState(false);
   const [players, setPlayers] = useState<any[]>([]);
   
@@ -44,7 +45,7 @@ function App() {
     if (!isInGame) return;
 
     // 1. Initialize Playroom MultiPlayer
-    initPlayroom().then(() => {
+    initPlayroom(roomCodeToJoin || undefined).then(() => {
       setConnected(true);
 
       // Default room states for host
@@ -247,12 +248,14 @@ function App() {
   };
 
   const handleHostGame = () => {
+    setRoomCodeToJoin(null);
     setIsInGame(true);
   };
 
   const handleJoinGame = (roomCode: string) => {
     const clean = roomCode.trim();
     if (!clean) return;
+    setRoomCodeToJoin(clean);
     const newUrl = `${window.location.origin}${window.location.pathname}?r=${clean}`;
     window.history.pushState({}, "", newUrl);
     setIsInGame(true);

@@ -15,13 +15,16 @@ export interface GameState {
   countdown: number;
 }
 
-export const initPlayroom = async () => {
+export const initPlayroom = async (roomCode?: string) => {
   try {
-    await insertCoin({
+    const opts: any = {
       skipLobby: true,
-      gameId: "hexaguys",
       discord: false,
-    });
+    };
+    if (roomCode) {
+      opts.roomCode = roomCode;
+    }
+    await insertCoin(opts);
     console.log("Playroom initialized successfully!");
   } catch (error) {
     console.error("Error initializing Playroom:", error);
