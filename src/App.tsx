@@ -56,10 +56,11 @@ function App() {
   const [mapId, setMapId] = useState("classic");
   const [floorsCount, setFloorsCount] = useState(3);
 
-  // Settings menu states (FPS and Ping active by default)
+  // Estados del menú de ajustes (FPS y Ping activos por defecto, Ping en nombres en false por defecto)
   const [showSettings, setShowSettings] = useState(false);
   const [showFps, setShowFps] = useState(true);
   const [showPing, setShowPing] = useState(true);
+  const [showPlayerPing, setShowPlayerPing] = useState(false);
   const [volume, setVolume] = useState(getGlobalVolume());
 
   // Listen to browser navigation changes (e.g. back/forward or link paste)
@@ -401,6 +402,8 @@ function App() {
           onToggleFps={handleToggleFps}
           showPing={showPing}
           onTogglePing={handleTogglePing}
+          showPlayerPing={showPlayerPing}
+          onTogglePlayerPing={() => setShowPlayerPing((prev) => !prev)}
           volume={volume}
           onVolumeChange={handleVolumeChange}
         />
@@ -413,6 +416,7 @@ function App() {
           gameStatus={gameStatus}
           mapId={mapId}
           floorsCount={floorsCount}
+          showPlayerPing={showPlayerPing}
         />
       </div>
     </KeyboardControls>

@@ -13,13 +13,15 @@ interface GameUIProps {
   onSelectFloors: (count: number) => void;
   onStartGame: () => void;
   onReturnToLobby?: () => void;
-  // Settings props
+  // Propiedades de Ajustes
   showSettings: boolean;
   onToggleSettings: () => void;
   showFps: boolean;
   onToggleFps: () => void;
   showPing: boolean;
   onTogglePing: () => void;
+  showPlayerPing?: boolean;
+  onTogglePlayerPing?: () => void;
   volume: number;
   onVolumeChange: (vol: number) => void;
 }
@@ -52,6 +54,8 @@ export function GameUI({
   onToggleFps,
   showPing,
   onTogglePing,
+  showPlayerPing = false,
+  onTogglePlayerPing,
   volume,
   onVolumeChange,
 }: GameUIProps) {
@@ -64,11 +68,13 @@ export function GameUI({
   const currentSkin = localPlayer?.getState("skin");
   const currentColor = localPlayer?.getState("color") || localPlayer?.getProfile()?.color?.hex || COLOR_PALETTE[0].hex;
   
+  // Cargar apodo persistido desde localStorage o generar uno aleatorio
   const [nickname, setNickname] = useState(() => {
-    return localPlayer?.getState("name") || localPlayer?.getProfile()?.name || `Jugador_${Math.floor(Math.random() * 900 + 100)}`;
+    const saved = typeof window !== "undefined" ? localStorage.getItem("hexaguys_username") : null;
+    return saved || localPlayer?.getState("name") || localPlayer?.getProfile()?.name || `Jugador_${Math.floor(Math.random() * 900 + 100)}`;
   });
 
-  // Sync nickname, default color & auto-assign initial skin on mount so player is immediately ready
+  // Sincronizar apodo, color por defecto y skin inicial al montar
   useEffect(() => {
     if (localPlayer) {
       if (!localPlayer.getState("name")) {
@@ -82,7 +88,7 @@ export function GameUI({
         localPlayer.setState("skin", defaultSkin);
       }
     }
-  }, [localPlayer, host]);
+  }, [localPlayer, host, nickname, currentColor]);
 
   const handleCopyLink = () => {
     const code = getRoomCode() || new URLSearchParams(window.location.search).get("r");
@@ -97,6 +103,14 @@ export function GameUI({
   const handleNameChange = (val: string) => {
     const clean = val.slice(0, 15);
     setNickname(clean);
+    // Persistir apodo en localStorage
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("hexaguys_username", clean);
+      } catch (e) {
+        console.warn("Error al persistir apodo:", e);
+      }
+    }
     if (localPlayer) {
       localPlayer.setState("name", clean || "Jugador");
     }
@@ -338,7 +352,7 @@ export function GameUI({
                 </button>
               </div>
 
-              {/* Ping / Latency Toggle (iOS Switch) */}
+              {/* Medidor de Ping / Latencia (Interruptor iOS) */}
               <div className="ios-glass-card p-4 rounded-2xl flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-white/90">Medidor de Ping</span>
@@ -361,7 +375,30 @@ export function GameUI({
                 </button>
               </div>
 
-              {/* Action Buttons */}
+              {/* Mostrar Ping en Nombres de Jugadores (Interruptor iOS) */}
+              <div className="ios-glass-card p-4 rounded-2xl flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-white/90">Ping en Nombres</span>
+                  <span className="text-[10px] text-white/45">Ver latencia en la etiqueta 3D de cada jugador</span>
+                </div>
+                <button
+                  onClick={() => {
+                    if (onTogglePlayerPing) onTogglePlayerPing();
+                    playStepSound();
+                  }}
+                  className={`w-12 h-7 rounded-full p-0.5 transition-colors duration-200 ease-in-out cursor-pointer relative ${
+                    showPlayerPing ? "ios-toggle-on" : "bg-white/20"
+                  }`}
+                >
+                  <span
+                    className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out block ${
+                      showPlayerPing ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Botones de Acción */}
               <div className="flex flex-col gap-2.5 pt-1">
                 <button
                   onClick={() => {

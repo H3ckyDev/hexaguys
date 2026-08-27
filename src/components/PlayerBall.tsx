@@ -14,12 +14,13 @@ function shortestAngleDiff(target: number, current: number) {
 }
 
 interface PlayerBallProps {
-  player: any; // Playroom player state
+  player: any; // Estado de jugador en Playroom
   playerIndex?: number;
   totalPlayers?: number;
   isLocal: boolean;
   gameStatus: string;
   floorsCount?: number;
+  showPlayerPing?: boolean;
 }
 
 export function PlayerBall({
@@ -29,6 +30,7 @@ export function PlayerBall({
   isLocal,
   gameStatus,
   floorsCount = 3,
+  showPlayerPing = false,
 }: PlayerBallProps) {
   const rbRef = useRef<RapierRigidBody>(null);
   const visualRef = useRef<THREE.Group>(null);
@@ -335,12 +337,18 @@ export function PlayerBall({
                 </div>
               )}
 
-              {/* Insignia de Apodo y Skin */}
+              {/* Insignia de Apodo, Ping (opcional) y Skin */}
               <div
                 className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow bg-slate-900/80 border border-slate-700 whitespace-nowrap flex items-center gap-1.5"
                 style={{ borderLeftColor: playerColor, borderLeftWidth: "4px" }}
               >
                 <span>{playerName}</span>
+                {showPlayerPing && (
+                  <span className="text-[9px] text-sky-300 font-mono bg-sky-950/80 px-1 py-0.2 rounded border border-sky-400/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
+                    {player.getState("ping") || (isLocal ? 24 : 32)}ms
+                  </span>
+                )}
                 <span className="text-[9px] text-slate-400 capitalize bg-slate-800 px-1 rounded">
                   {skinType}
                 </span>

@@ -13,6 +13,7 @@ interface GameSceneProps {
   gameStatus: string;
   mapId: string;
   floorsCount?: number;
+  showPlayerPing?: boolean;
 }
 
 export function GameScene({
@@ -22,6 +23,7 @@ export function GameScene({
   gameStatus,
   mapId,
   floorsCount = 3,
+  showPlayerPing = false,
 }: GameSceneProps) {
   const localPlayer = myPlayer();
   const sortedPlayers = [...players].sort((a, b) => a.id.localeCompare(b.id));
@@ -72,6 +74,7 @@ export function GameScene({
               isLocal={Boolean(localPlayer && p.id === localPlayer.id)}
               gameStatus={gameStatus}
               floorsCount={floorsCount}
+              showPlayerPing={showPlayerPing}
             />
           ))}
         </Physics>
