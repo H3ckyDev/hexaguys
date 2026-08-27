@@ -14,9 +14,10 @@ interface HexTileProps {
   floor: number;
   steppedAt: number | null;
   onStep: (id: string) => void;
+  gameStatus?: string;
 }
 
-function HexTile({ id, position, floor, steppedAt, onStep }: HexTileProps) {
+function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTileProps) {
   const [isBroken, setIsBroken] = useState(false);
   const [scaleY, setScaleY] = useState(1);
   const [posY, setPosY] = useState(position[1]);
@@ -76,7 +77,7 @@ function HexTile({ id, position, floor, steppedAt, onStep }: HexTileProps) {
     }
   });
 
-  if (isBroken && posY <= -15) {
+  if (isBroken && posY <= -20) {
     return null; // Don't render if fallen too deep
   }
 
@@ -131,7 +132,8 @@ function HexTile({ id, position, floor, steppedAt, onStep }: HexTileProps) {
       onCollisionEnter={(event) => {
         const otherNode = event.other.rigidBodyObject;
         if (otherNode && otherNode.userData && otherNode.userData.type === "player") {
-          if (steppedAt === null) {
+          // Only collapse tiles during active match (never in LOBBY or COUNTDOWN)
+          if (steppedAt === null && gameStatus === "PLAYING") {
             onStep(id);
           }
         }
@@ -157,9 +159,10 @@ interface HexGridProps {
   onStep: (id: string) => void;
   mapId: string;
   floorsCount?: number;
+  gameStatus?: string;
 }
 
-export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3 }: HexGridProps) {
+export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
   const [tiles, setTiles] = useState<any[]>([]);
 
   useEffect(() => {
@@ -199,6 +202,7 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3 }: HexGrid
           floor={tile.floor}
           steppedAt={brokenTiles[tile.id] || null}
           onStep={onStep}
+          gameStatus={gameStatus}
         />
       ))}
     </group>

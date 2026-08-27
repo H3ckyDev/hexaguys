@@ -52,12 +52,12 @@ export function PlayerBall({
   const playerColor = player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8";
   const playerName = player.getState("name") || player.getProfile()?.name || `Player ${player.id.slice(0, 3)}`;
   
-  // Fetch skin from playroom state (no default skin initially)
-  const skinType = player.getState("skin");
+  // Fetch skin from playroom state (default to robot if not chosen)
+  const skinType = player.getState("skin") || "robot";
 
   // Reset player position safely on countdown start
   useEffect(() => {
-    if (isLocal && skinType && gameStatus === "COUNTDOWN") {
+    if (isLocal && gameStatus === "COUNTDOWN") {
       smoothCamTarget.current.set(spawnX, spawnY, spawnZ);
       player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });
@@ -71,7 +71,7 @@ export function PlayerBall({
         rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
     }
-  }, [gameStatus, isLocal, player, skinType, spawnX, spawnY, spawnZ]);
+  }, [gameStatus, isLocal, player, spawnX, spawnY, spawnZ]);
 
   const userData = { type: "player", playerId: player.id };
 
@@ -89,8 +89,14 @@ export function PlayerBall({
       const grounded = Math.abs(linvel.y) < 0.35;
       setIsGrounded(grounded);
 
+      // Auto-respawn in LOBBY if player jumps off the edge
+      if (gameStatus === "LOBBY" && translation.y < topFloorY - 1.5) {
+        rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
+        rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      }
+
       if (isAlive) {
-        // Keyboard inputs (only active during PLAYING status)
+        // Keyboard inputs (active during PLAYING and LOBBY practice)
         let vx = 0;
         let vz = 0;
         
@@ -98,10 +104,10 @@ export function PlayerBall({
         const isSprinting = Boolean(keys.sprint);
         const speed = isSprinting ? 6.8 : 3.8;
 
-        // Only accept keyboard inputs when game is PLAYING and current window is focused
+        // Accept keyboard inputs when game is PLAYING or LOBBY and current window is focused
         const hasFocus = typeof document === "undefined" || document.hasFocus();
 
-        if (gameStatus === "PLAYING" && hasFocus) {
+        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && hasFocus) {
           if (keys.forward) vz -= speed;
           if (keys.backward) vz += speed;
           if (keys.left) vx -= speed;
@@ -110,13 +116,12 @@ export function PlayerBall({
           // Normalize diagonal movement so player doesn't move faster diagonally
           if (vx !== 0 && vz !== 0) {
             vx *= 0.7071;
-            vz *= 0.7071;
           }
         }
 
-        // Jump physics & Sound (only active during PLAYING status when focused)
+        // Jump physics & Sound (active during PLAYING and LOBBY when focused)
         let vy = linvel.y;
-        if (gameStatus === "PLAYING" && hasFocus && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
+        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && hasFocus && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
           vy = 8.0; // Balanced jump impulse
           setLastJumpTime(Date.now());
           playJumpSound(); // Play procedural jump synth
@@ -124,7 +129,7 @@ export function PlayerBall({
 
         // Apply movement vector
         if (rbRef.current) {
-          if (gameStatus === "PLAYING") {
+          if (gameStatus === "PLAYING" || gameStatus === "LOBBY") {
             rbRef.current.setLinvel({ x: vx, y: vy, z: vz }, true);
           } else if (gameStatus === "COUNTDOWN") {
             // Strictly anchor at first (top) floor spawn coordinates during countdown
@@ -277,8 +282,7 @@ export function PlayerBall({
   });
 
   const isAlive = player.getState("isAlive") !== false;
-  const shouldBeVisible = isAlive && gameStatus !== "ROUND_OVER" && gameStatus !== "LOBBY";
-  if (!skinType || gameStatus === "LOBBY") return null; // Block spawn in lobby or if skin not chosen!
+  const shouldBeVisible = isAlive && gameStatus !== "ROUND_OVER";
 
   return (
     <group>

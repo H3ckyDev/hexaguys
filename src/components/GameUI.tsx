@@ -59,6 +59,7 @@ export function GameUI({
   const host = isHost();
   const localPlayer = myPlayer();
   const [showCustomizerInEnd, setShowCustomizerInEnd] = useState(false);
+  const [showLobbyCustomizer, setShowLobbyCustomizer] = useState(false);
   
   const currentSkin = localPlayer?.getState("skin");
   const currentColor = localPlayer?.getState("color") || localPlayer?.getProfile()?.color?.hex || COLOR_PALETTE[0].hex;
@@ -82,11 +83,6 @@ export function GameUI({
       }
     }
   }, [localPlayer, host]);
-
-  // Check if all joined players have chosen a character skin
-  const allPlayersHaveSkins = players.length > 0 && players.every(
-    (p) => p.getState("skin") !== undefined && p.getState("skin") !== null
-  );
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -399,195 +395,184 @@ export function GameUI({
           </div>
         )}
 
-        {/* Start Game Custom Lobby Overlay */}
+        {/* Interactive Floating 3D Lobby UI */}
         {gameStatus === "LOBBY" && !showSettings && (
-          <div className="ios-glass-panel p-6 md:p-8 rounded-[36px] flex flex-col gap-6 max-w-xl w-full text-white animate-in fade-in zoom-in duration-200">
-            {/* Header */}
-            <div className="text-center">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-sky-400 px-2.5 py-0.5 rounded-full bg-sky-400/10 border border-sky-400/20">
-                Lobby Multiplayer
+          <div className="w-full flex flex-col items-center gap-4 pointer-events-none">
+            {/* Top Lobby Floating Hub */}
+            <div className="ios-glass-panel px-5 py-2.5 rounded-full flex items-center gap-3 pointer-events-auto shadow-2xl animate-in slide-in-from-top duration-300">
+              <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping inline-block" />
+                Sala de Espera
               </span>
-              <h2 className="text-2xl font-black tracking-tight text-white mt-2">
-                Personaliza tu Personaje
-              </h2>
-              <p className="text-white/50 text-xs mt-0.5">Configura tu aspecto antes del despegue</p>
+
+              <span className="w-[1px] h-3 bg-white/20" />
+
+              <button
+                onClick={() => {
+                  playStepSound();
+                  setShowLobbyCustomizer((prev) => !prev);
+                }}
+                className="ios-btn-secondary px-3 py-1 rounded-full text-xs font-semibold text-white/90 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+              >
+                <span>🎨</span>
+                <span>{showLobbyCustomizer ? "Cerrar Ajustes" : "Personalizar Traje & Opciones"}</span>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Left Column: Name & Color */}
-              <div className="ios-glass-card p-4 rounded-2xl flex flex-col gap-4">
-                {/* 1. NICKNAME INPUT */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold text-white/70 tracking-tight">
-                    Tu Apodo:
-                  </label>
-                  <input
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onKeyUp={(e) => e.stopPropagation()}
-                    onKeyPress={(e) => e.stopPropagation()}
-                    placeholder="Escribe tu apodo..."
-                    maxLength={15}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/15 focus:border-sky-400 focus:outline-none text-white text-xs font-semibold placeholder:text-white/30 transition-all shadow-inner"
-                  />
+            {/* Floating Customizer Glass Panel (Open on demand) */}
+            {showLobbyCustomizer && (
+              <div className="ios-glass-panel p-6 rounded-[32px] flex flex-col gap-4 max-w-lg w-full text-white pointer-events-auto shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center pb-1 border-b border-white/10">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>🎨</span> Personalización de Personaje
+                  </h3>
+                  <button
+                    onClick={() => setShowLobbyCustomizer(false)}
+                    className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-white/60 text-xs flex items-center justify-center cursor-pointer"
+                  >
+                    ✕
+                  </button>
                 </div>
 
-                {/* 2. COLOR PALETTE */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold text-white/70 tracking-tight">
-                    Color de Traje:
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {COLOR_PALETTE.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => handleSelectColor(c.hex)}
-                        className={`h-9 rounded-xl transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm ${
-                          currentColor === c.hex
-                            ? "ring-2 ring-white scale-105 shadow-md"
-                            : "opacity-75 hover:opacity-100 ring-1 ring-white/20"
-                        }`}
-                        style={{ backgroundColor: c.hex }}
-                        title={c.name}
-                      >
-                        {currentColor === c.hex && (
-                          <span className="text-white drop-shadow font-black text-xs">✓</span>
-                        )}
-                      </button>
-                    ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {/* Left Column: Name & Color */}
+                  <div className="ios-glass-card p-3.5 rounded-2xl flex flex-col gap-3">
+                    {/* 1. NICKNAME INPUT */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold text-white/70">Tu Apodo:</label>
+                      <input
+                        type="text"
+                        value={nickname}
+                        onChange={(e) => handleNameChange(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onKeyUp={(e) => e.stopPropagation()}
+                        onKeyPress={(e) => e.stopPropagation()}
+                        placeholder="Escribe tu apodo..."
+                        maxLength={15}
+                        className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/15 focus:border-sky-400 focus:outline-none text-white text-xs font-semibold shadow-inner"
+                      />
+                    </div>
+
+                    {/* 2. COLOR PALETTE */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold text-white/70">Color de Traje:</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {COLOR_PALETTE.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleSelectColor(c.hex)}
+                            className={`h-7 rounded-lg transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm ${
+                              currentColor === c.hex
+                                ? "ring-2 ring-white scale-105 shadow-md"
+                                : "opacity-75 hover:opacity-100 ring-1 ring-white/20"
+                            }`}
+                            style={{ backgroundColor: c.hex }}
+                            title={c.name}
+                          >
+                            {currentColor === c.hex && (
+                              <span className="text-white drop-shadow font-black text-[10px]">✓</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Right Column: Skin & Map */}
-              <div className="ios-glass-card p-4 rounded-2xl flex flex-col gap-4">
-                {/* 3. SKIN SELECTOR */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[11px] font-semibold text-white/70 tracking-tight">
-                      Personaje:
-                    </label>
-                    {!currentSkin && (
-                      <span className="text-[10px] text-rose-400 font-semibold animate-pulse">
-                        Requerido
-                      </span>
+                  {/* Right Column: Skin & Arena */}
+                  <div className="ios-glass-card p-3.5 rounded-2xl flex flex-col gap-3">
+                    {/* 3. SKIN SELECTOR */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold text-white/70">Personaje:</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {skinsList.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => handleSelectSkin(s.id)}
+                            className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all cursor-pointer active:scale-95 ${
+                              currentSkin === s.id
+                                ? "bg-sky-500/25 border-sky-400/80 text-white shadow ring-1 ring-sky-400/40"
+                                : "bg-white/5 border-white/10 hover:border-white/25 text-white/60 hover:text-white"
+                            }`}
+                          >
+                            <span className="text-xl">{s.icon}</span>
+                            <span className="text-[9px] font-medium mt-0.5">{s.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 4. HOST ARENA / FLOOR SETTINGS */}
+                    {host && (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[11px] font-semibold text-white/70">Arena:</label>
+                          <div className="grid grid-cols-3 gap-1">
+                            {mapsList.map((m) => (
+                              <button
+                                key={m.id}
+                                onClick={() => handleSelectMap(m.id)}
+                                className={`py-1 px-1.5 rounded-lg border text-center transition-all cursor-pointer ${
+                                  mapId === m.id
+                                    ? "bg-indigo-500/30 border-indigo-400/80 text-white ring-1 ring-indigo-400/40"
+                                    : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+                                }`}
+                              >
+                                <span className="text-[11px] font-semibold">{m.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[11px] font-semibold text-white/70">Pisos:</label>
+                            <span className="text-[11px] text-sky-400 font-mono font-bold">{floorsCount} Pisos</span>
+                          </div>
+                          <div className="grid grid-cols-6 gap-1">
+                            {floorOptions.map((f) => (
+                              <button
+                                key={f.count}
+                                onClick={() => handleSelectFloorsBtn(f.count)}
+                                className={`py-1 rounded-lg border text-center transition-all cursor-pointer ${
+                                  floorsCount === f.count
+                                    ? "bg-sky-500/30 border-sky-400/80 text-white"
+                                    : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+                                }`}
+                              >
+                                <span className="text-xs font-bold">{f.count}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {skinsList.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => handleSelectSkin(s.id)}
-                        className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer active:scale-95 ${
-                          currentSkin === s.id
-                            ? "bg-sky-500/25 border-sky-400/80 text-white shadow-lg ring-1 ring-sky-400/40 scale-105"
-                            : "bg-white/5 border-white/10 hover:border-white/25 text-white/60 hover:text-white"
-                        }`}
-                      >
-                        <span className="text-2xl">{s.icon}</span>
-                        <span className="text-[10px] font-medium mt-1">{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
-
-                {/* 4. MAP SELECTOR */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold text-white/70 tracking-tight">
-                    Arena de Combate:
-                  </label>
-                  {host ? (
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {mapsList.map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => handleSelectMap(m.id)}
-                          className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center active:scale-95 ${
-                            mapId === m.id
-                              ? "bg-indigo-500/30 border-indigo-400/80 text-white shadow-md ring-1 ring-indigo-400/40"
-                              : "bg-white/5 border-white/10 hover:border-white/25 text-white/60 hover:text-white"
-                          }`}
-                        >
-                          <span className="text-xs font-semibold">{m.name}</span>
-                          <span className="text-[8px] text-white/45 mt-0.5">{m.desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-2.5 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center text-xs">
-                      <span className="text-white/50">Elegido por Anfitrión:</span>
-                      <span className="text-indigo-300 font-bold capitalize">
-                        {mapsList.find((m) => m.id === mapId)?.name || "Clásico"}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 5. FLOORS COUNT SELECTOR */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[11px] font-semibold text-white/70 tracking-tight">
-                      Pisos Disponibles:
-                    </label>
-                    <span className="text-[11px] text-sky-400 font-mono font-bold">
-                      {floorsCount} Pisos
-                    </span>
-                  </div>
-                  {host ? (
-                    <div className="grid grid-cols-6 gap-1">
-                      {floorOptions.map((f) => (
-                        <button
-                          key={f.count}
-                          onClick={() => handleSelectFloorsBtn(f.count)}
-                          className={`py-1.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center active:scale-95 ${
-                            floorsCount === f.count
-                              ? "bg-sky-500/30 border-sky-400/80 text-white shadow-md ring-1 ring-sky-400/40 scale-105"
-                              : "bg-white/5 border-white/10 hover:border-white/25 text-white/60 hover:text-white"
-                          }`}
-                          title={`${f.count} Pisos (${f.desc})`}
-                        >
-                          <span className="text-xs font-bold">{f.count}</span>
-                          <span className="text-[7px] text-white/40 leading-none">{f.desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-2.5 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center text-xs">
-                      <span className="text-white/50">Configuración:</span>
-                      <span className="text-sky-300 font-bold capitalize">
-                        {floorsCount} Pisos ({floorOptions.find((f) => f.count === floorsCount)?.desc || "Personalizado"})
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* START BUTTON / WAITING BADGE */}
-            {host ? (
-              <button
-                disabled={!allPlayersHaveSkins}
-                onClick={() => {
-                  if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                  }
-                  onStartGame();
-                }}
-                className={`w-full py-4 rounded-2xl text-xs uppercase font-extrabold tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xl ${
-                  allPlayersHaveSkins
-                    ? "ios-btn-primary text-white"
-                    : "bg-white/5 border border-white/10 text-white/30 cursor-not-allowed"
-                }`}
-              >
-                <span>🚀 Comenzar Partida</span>
-              </button>
-            ) : (
-              <div className="ios-glass-card py-3.5 rounded-2xl text-amber-300 text-xs font-semibold text-center animate-pulse">
-                Esperando a que el Anfitrión inicie la partida...
               </div>
             )}
+
+            {/* Bottom Play Action (Host vs Guest) */}
+            <div className="pointer-events-auto mt-2">
+              {host ? (
+                <button
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    onStartGame();
+                  }}
+                  className="ios-btn-primary px-8 py-3.5 rounded-2xl text-xs uppercase font-extrabold tracking-wider text-white shadow-2xl flex items-center gap-2.5 cursor-pointer active:scale-95 hover:scale-102 transition-all ring-2 ring-sky-400/40"
+                >
+                  <span className="text-base">🚀</span>
+                  <span>Comenzar Partida</span>
+                </button>
+              ) : (
+                <div className="ios-pill px-6 py-2.5 rounded-full text-amber-300 text-xs font-semibold flex items-center gap-2 shadow-xl animate-pulse">
+                  <span>⏳</span>
+                  <span>Esperando a que el Anfitrión inicie la partida...</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

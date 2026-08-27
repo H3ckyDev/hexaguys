@@ -60,6 +60,7 @@ export function GameScene({
             onStep={onStepTile}
             mapId={mapId}
             floorsCount={floorsCount}
+            gameStatus={gameStatus}
           />
           
           {sortedPlayers.map((p, idx) => (
