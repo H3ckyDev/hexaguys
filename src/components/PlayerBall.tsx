@@ -78,6 +78,48 @@ export function PlayerBall({
     }
   }, [gameStatus, isLocal, player, spawnX, spawnY, spawnZ, topFloorY]);
 
+  // Detección de inactividad (AFK / Pestaña en segundo plano)
+  useEffect(() => {
+    if (!isLocal || !player) return;
+
+    let lastActivity = Date.now();
+    let isCurrentlyAfk = false;
+
+    const handleActivity = () => {
+      lastActivity = Date.now();
+      if (isCurrentlyAfk) {
+        isCurrentlyAfk = false;
+        player.setState("isAfk", false);
+      }
+    };
+
+    const interval = setInterval(() => {
+      const isHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+      const isInactive = Date.now() - lastActivity > 20000; // 20 segundos sin interacción
+
+      const shouldBeAfk = isHidden || isInactive;
+      if (shouldBeAfk !== isCurrentlyAfk) {
+        isCurrentlyAfk = shouldBeAfk;
+        player.setState("isAfk", shouldBeAfk);
+      }
+    }, 1500);
+
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("touchstart", handleActivity);
+    window.addEventListener("focus", handleActivity);
+    window.addEventListener("visibilitychange", handleActivity);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("touchstart", handleActivity);
+      window.removeEventListener("focus", handleActivity);
+      window.removeEventListener("visibilitychange", handleActivity);
+    };
+  }, [isLocal, player]);
+
   const userData = { type: "player", playerId: player.id };
 
   useFrame((state) => {
@@ -273,6 +315,9 @@ export function PlayerBall({
   const lastChat = player.getState("lastChat");
   const isChatActive = lastChat && Date.now() - lastChat.timestamp < 4500;
 
+  // Comprobar estado de inactividad AFK
+  const isAfk = Boolean(player.getState("isAfk"));
+
   return (
     <group>
       <RigidBody
@@ -301,7 +346,7 @@ export function PlayerBall({
           />
         </group>
 
-        {/* Etiqueta flotante con nombre y burbuja de chat 3D (con zIndexRange bajo para quedar detrás de cualquier modal) */}
+        {/* Etiqueta flotante con nombre, insignia AFK y burbuja de chat 3D */}
         {shouldBeVisible && (
           <Html distanceFactor={10} position={[0, 1.5, 0]} center zIndexRange={[10, 0]}>
             <div className="flex flex-col items-center pointer-events-none select-none">
@@ -314,12 +359,17 @@ export function PlayerBall({
                 </div>
               )}
 
-              {/* Insignia de Apodo, Ping (opcional) y Skin */}
+              {/* Insignia de Apodo, AFK, Ping (opcional) y Skin */}
               <div
                 className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow bg-slate-900/80 border border-slate-700 whitespace-nowrap flex items-center gap-1.5"
                 style={{ borderLeftColor: playerColor, borderLeftWidth: "4px" }}
               >
                 <span>{playerName}</span>
+                {isAfk && (
+                  <span className="text-[9px] text-amber-300 font-extrabold bg-amber-950/90 px-1 py-0.2 rounded border border-amber-400/40 flex items-center gap-0.5 animate-pulse">
+                    💤 AFK
+                  </span>
+                )}
                 {showPlayerPing && (
                   <span className="text-[9px] text-sky-300 font-mono bg-sky-950/80 px-1 py-0.2 rounded border border-sky-400/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />

@@ -249,9 +249,11 @@ export function GameUI({
                 ? skinsList.find((s) => s.id === skin)?.icon || "🤖"
                 : "❓";
 
+              const isAfk = Boolean(p.getState("isAfk"));
+
               return (
                 <div key={p.id} className="flex justify-between items-center gap-2">
-                  <div className="flex items-center gap-2 truncate">
+                  <div className="flex items-center gap-1.5 truncate">
                     <span
                       className="w-3 h-3 rounded-full inline-block shrink-0 shadow-sm ring-1 ring-white/30"
                       style={{ backgroundColor: pColor }}
@@ -261,12 +263,20 @@ export function GameUI({
                         !hasSelected
                           ? "text-white/40 italic animate-pulse"
                           : isAlive
-                          ? "text-white/90"
+                          ? isAfk
+                            ? "text-amber-300"
+                            : "text-white/90"
                           : "text-white/35 line-through"
                       }`}
                     >
                       {skinIcon} {pName}
                     </span>
+                    {/* Indicador de inactividad AFK */}
+                    {isAfk && isAlive && (
+                      <span className="text-[10px] text-amber-300 animate-pulse font-bold" title="Ausente / AFK">
+                        💤
+                      </span>
+                    )}
                   </div>
                   <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/10 text-amber-300 ring-1 ring-white/10">
                     🏆 {score}
