@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { playBreakSound } from "../utils/sounds";
 
 export const HEX_RADIUS = 1.0;
-const STEP_DELAY = 800; // ms before tile falls/disappears
+const STEP_DELAY = 2000; // 2.0 seconds delay before tile falls
 
 interface HexTileProps {
   id: string;
@@ -109,7 +109,7 @@ function HexTile({ id, position, floor, steppedAt, onStep }: HexTileProps) {
         rotation={[0, Math.PI / 6, 0]}
         castShadow
       >
-        <cylinderGeometry args={[HEX_RADIUS * 0.95, HEX_RADIUS * 0.95, 0.4, 6]} />
+        <cylinderGeometry args={[HEX_RADIUS * 0.985, HEX_RADIUS * 0.985, 0.4, 6]} />
         <meshStandardMaterial
           color={color}
           roughness={0.2}
@@ -126,7 +126,7 @@ function HexTile({ id, position, floor, steppedAt, onStep }: HexTileProps) {
       type="fixed"
       colliders="hull"
       position={[position[0], position[1], position[2]]}
-      friction={0.1}
+      friction={0}
       restitution={0}
       onCollisionEnter={(event) => {
         const otherNode = event.other.rigidBodyObject;
@@ -138,7 +138,7 @@ function HexTile({ id, position, floor, steppedAt, onStep }: HexTileProps) {
       }}
     >
       <mesh scale={[1, scaleY, 1]} rotation={[0, Math.PI / 6, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[HEX_RADIUS * 0.95, HEX_RADIUS * 0.95, 0.4, 6]} />
+        <cylinderGeometry args={[HEX_RADIUS * 0.985, HEX_RADIUS * 0.985, 0.4, 6]} />
         <meshStandardMaterial
           ref={matRef}
           color={color}

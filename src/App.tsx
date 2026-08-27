@@ -6,8 +6,7 @@ import { GameScene } from "./components/GameScene";
 import { GameUI } from "./components/GameUI";
 import { LandingPage } from "./components/LandingPage";
 import { playWinSound, playFallSound, playStepSound, setGlobalVolume, getGlobalVolume } from "./utils/sounds";
-import { FPSCounter } from "./components/FPSCounter";
-import { PingCounter } from "./components/PingCounter";
+import { PerformanceHUD } from "./components/PerformanceHUD";
 
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
@@ -35,10 +34,10 @@ function App() {
   const [mapId, setMapId] = useState("classic");
   const [floorsCount, setFloorsCount] = useState(3);
 
-  // Settings menu states
+  // Settings menu states (FPS and Ping active by default)
   const [showSettings, setShowSettings] = useState(false);
-  const [showFps, setShowFps] = useState(false);
-  const [showPing, setShowPing] = useState(false);
+  const [showFps, setShowFps] = useState(true);
+  const [showPing, setShowPing] = useState(true);
   const [volume, setVolume] = useState(getGlobalVolume());
 
   useEffect(() => {
@@ -277,11 +276,8 @@ function App() {
   return (
     <KeyboardControls map={keyboardMap}>
       <div className="w-full h-full relative overflow-hidden bg-[#0d0e12]">
-        {/* FPS Counter overlay */}
-        {showFps && <FPSCounter />}
-
-        {/* Ping / Latency Indicator overlay */}
-        {showPing && <PingCounter />}
+        {/* Single-line Performance HUD overlay (FPS & Ping in bottom-right corner) */}
+        <PerformanceHUD showFps={showFps} showPing={showPing} />
 
         {/* React 2D User Interface Overlay */}
         <GameUI
