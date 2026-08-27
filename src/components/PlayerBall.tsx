@@ -290,24 +290,28 @@ export function PlayerBall({
   const isAlive = player.getState("isAlive") !== false;
   const shouldBeVisible = isAlive && gameStatus !== "ROUND_OVER";
 
+  // Comprobar si hay un mensaje de chat reciente para mostrar en la burbuja 3D (duración de 4.5s)
+  const lastChat = player.getState("lastChat");
+  const isChatActive = lastChat && Date.now() - lastChat.timestamp < 4500;
+
   return (
     <group>
       <RigidBody
         ref={rbRef}
         type={isLocal ? (gameStatus === "COUNTDOWN" ? "fixed" : "dynamic") : "kinematicPosition"}
-        colliders={false} // Custom capsule collider
+        colliders={false} // Colisionador de cápsula personalizado
         position={[spawnX, spawnY, spawnZ]}
         enabledTranslations={[true, true, true]}
-        enabledRotations={[false, true, false]} // Lock rotation in X and Z! Character stays upright.
+        enabledRotations={[false, true, false]} // Bloqueo de rotación en X y Z para mantener al personaje erguido
         userData={userData}
         linearDamping={0.4}
         angularDamping={1.0}
         ccd={true}
       >
-        {/* Capsule collider perfectly aligned with feet and head; zero friction prevents snagging on tile seams */}
+        {/* Colisionador de cápsula perfectamente alineado; fricción cero para evitar atascos */}
         <CapsuleCollider args={[0.32, 0.30]} position={[0, 0.20, 0]} friction={0} restitution={0} />
 
-        {/* Character Visual Wrapper (Hidden when eliminated or when round is over) */}
+        {/* Modelo visual 3D del personaje */}
         <group ref={visualRef} visible={shouldBeVisible}>
           <CharacterModel
             type={skinType}
@@ -318,17 +322,29 @@ export function PlayerBall({
           />
         </group>
 
-        {/* Floating HTML Name tag overlay */}
+        {/* Etiqueta flotante con nombre y burbuja de chat 3D */}
         {shouldBeVisible && (
-          <Html distanceFactor={10} position={[0, 1.4, 0]} center>
-            <div
-              className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow bg-slate-900/80 border border-slate-700 whitespace-nowrap flex items-center gap-1.5"
-              style={{ borderLeftColor: playerColor, borderLeftWidth: "4px" }}
-            >
-              <span>{playerName}</span>
-              <span className="text-[9px] text-slate-400 capitalize bg-slate-800 px-1 rounded">
-                {skinType}
-              </span>
+          <Html distanceFactor={10} position={[0, 1.5, 0]} center>
+            <div className="flex flex-col items-center pointer-events-none select-none">
+              {/* Burbuja de diálogo 3D flotante */}
+              {isChatActive && (
+                <div className="mb-2 px-3 py-1.5 rounded-2xl bg-white/95 text-slate-900 text-xs font-black shadow-2xl border-2 border-sky-400 max-w-[200px] text-center break-words animate-in zoom-in-90 duration-150 relative">
+                  <span>{lastChat.text}</span>
+                  {/* Flecha inferior de la burbuja */}
+                  <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white absolute -bottom-[6px] left-1/2 -translate-x-1/2" />
+                </div>
+              )}
+
+              {/* Insignia de Apodo y Skin */}
+              <div
+                className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow bg-slate-900/80 border border-slate-700 whitespace-nowrap flex items-center gap-1.5"
+                style={{ borderLeftColor: playerColor, borderLeftWidth: "4px" }}
+              >
+                <span>{playerName}</span>
+                <span className="text-[9px] text-slate-400 capitalize bg-slate-800 px-1 rounded">
+                  {skinType}
+                </span>
+              </div>
             </div>
           </Html>
         )}

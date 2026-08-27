@@ -5,8 +5,9 @@ import { initPlayroom } from "./playroom";
 import { GameScene } from "./components/GameScene";
 import { GameUI } from "./components/GameUI";
 import { LandingPage } from "./components/LandingPage";
-import { playWinSound, playFallSound, playStepSound, setGlobalVolume, getGlobalVolume } from "./utils/sounds";
+import { playWinSound, playFallSound, playStepSound, playChatSound, setGlobalVolume, getGlobalVolume } from "./utils/sounds";
 import { PerformanceHUD } from "./components/PerformanceHUD";
+import { ChatOverlay, type ChatMessage } from "./components/ChatOverlay";
 
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
@@ -20,18 +21,18 @@ const keyboardMap = [
 function getRoomCodeFromUrl(): string | null {
   if (typeof window === "undefined") return null;
   
-  // 1. Search Query Parameters (?r=abcd, ?room=abcd, ?roomCode=abcd)
+  // 1. Parámetros de consulta en URL (?r=abcd, ?room=abcd, ?roomCode=abcd)
   const searchParams = new URLSearchParams(window.location.search);
   const searchRoom = searchParams.get("r") || searchParams.get("room") || searchParams.get("roomCode");
   if (searchRoom && searchRoom.trim()) return searchRoom.trim();
 
-  // 2. Hash Parameters (#r=abcd, #room=abcd)
+  // 2. Parámetros de hash (#r=abcd, #room=abcd)
   if (window.location.hash) {
     const hashMatch = window.location.hash.match(/[?&#]r(?:oom)?=([^&]+)/i);
     if (hashMatch && hashMatch[1]) return hashMatch[1].trim();
   }
 
-  // 3. Path Parameters (/r/abcd, /room/abcd)
+  // 3. Parámetros de ruta (/r/abcd, /room/abcd)
   const pathMatch = window.location.pathname.match(/\/(?:r|room)\/([^/?#]+)/i);
   if (pathMatch && pathMatch[1]) return pathMatch[1].trim();
 
@@ -45,8 +46,9 @@ function App() {
   const [roomCodeToJoin, setRoomCodeToJoin] = useState<string | null>(initialRoom);
   const [connected, setConnected] = useState(false);
   const [players, setPlayers] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   
-  // Local reactive room states synced from Playroom Room State
+  // Estados reactivos sincronizados desde el estado de sala de Playroom
   const [gameStatus, setGameStatus] = useState<"LOBBY" | "COUNTDOWN" | "PLAYING" | "ROUND_OVER">("LOBBY");
   const [countdown, setCountdown] = useState(5);
   const [winnerId, setWinnerId] = useState<string | null>(null);
@@ -143,7 +145,15 @@ function App() {
         }
       });
 
-      // Track players joining/leaving
+      // Registro de mensajes de chat en tiempo real sincronizados
+      RPC.register("chatMessage", async (msg: ChatMessage) => {
+        if (msg && msg.text) {
+          setMessages((prev) => [...prev.slice(-49), msg]);
+          playChatSound();
+        }
+      });
+
+      // Seguimiento de jugadores que se unen/salen
       onPlayerJoin((player) => {
         setPlayers((prev) => {
           if (prev.some((p) => p.id === player.id)) return prev;
@@ -310,6 +320,27 @@ function App() {
     setShowPing((prev) => !prev);
   };
 
+  const handleSendMessage = (text: string) => {
+    const player = myPlayer();
+    if (!player) return;
+
+    const msg: ChatMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      senderId: player.id,
+      senderName: player.getState("name") || player.getProfile()?.name || "Jugador",
+      senderColor: player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8",
+      senderSkin: player.getState("skin") || "robot",
+      text: text.slice(0, 120),
+      timestamp: Date.now(),
+    };
+
+    // Guardar en el estado del jugador para la burbuja 3D sobre su avatar
+    player.setState("lastChat", { text: msg.text, timestamp: msg.timestamp });
+
+    // Difusión instantánea a todos los jugadores de la sala
+    RPC.call("chatMessage", msg, RPC.Mode.ALL);
+  };
+
   const handleHostGame = () => {
     setRoomCodeToJoin(null);
     setIsInGame(true);
@@ -342,10 +373,17 @@ function App() {
   return (
     <KeyboardControls map={keyboardMap}>
       <div className="w-full h-full relative overflow-hidden bg-[#0d0e12]">
-        {/* Single-line Performance HUD overlay (FPS & Ping in bottom-right corner) */}
+        {/* HUD de Rendimiento en una sola línea (FPS y Ping en la esquina inferior derecha) */}
         <PerformanceHUD showFps={showFps} showPing={showPing} />
 
-        {/* React 2D User Interface Overlay */}
+        {/* Chat Multijugador en tiempo real con diseño iOS 26 (Esquina inferior izquierda) */}
+        <ChatOverlay
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          localPlayerId={myPlayer()?.id}
+        />
+
+        {/* Interfaz 2D React Superpuesta */}
         <GameUI
           players={players}
           gameStatus={gameStatus}
@@ -367,7 +405,7 @@ function App() {
           onVolumeChange={handleVolumeChange}
         />
 
-        {/* 3D WebGL Canvas Scene */}
+        {/* Escena 3D WebGL Canvas */}
         <GameScene
           players={players}
           brokenTiles={brokenTiles}

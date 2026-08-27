@@ -814,16 +814,9 @@ export function GameUI({
         )}
       </div>
 
-      {/* BOTTOM DOCK */}
+      {/* DOCK INFERIOR */}
       <div className="flex justify-between items-end pointer-events-none">
         <div className="flex items-center gap-2.5">
-          <div className="ios-pill px-4 py-2 rounded-full text-white/70 text-[11px] font-medium max-w-sm flex items-center gap-1.5 shadow-lg">
-            <strong className="text-sky-400 font-semibold">WASD</strong> caminar •{" "}
-            <strong className="text-sky-400 font-semibold">Shift</strong> correr •{" "}
-            <strong className="text-sky-400 font-semibold">Espacio</strong> saltar •{" "}
-            <strong className="text-sky-400 font-semibold">ESC</strong> menú
-          </div>
-
           {gameStatus === "PLAYING" && (
             <div className="ios-pill px-3.5 py-2 rounded-full text-white text-xs flex items-center gap-2 font-mono shadow-lg">
               <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] inline-block animate-pulse" />

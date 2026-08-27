@@ -130,7 +130,7 @@ export function playWinSound() {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = "square"; // Nice retro square wave!
+      osc.type = "square"; // Onda cuadrada retro agradable
       osc.frequency.setValueAtTime(freq, noteTime);
 
       gain.gain.setValueAtTime(0.18 * globalVolume, noteTime);
@@ -142,6 +142,32 @@ export function playWinSound() {
       osc.start(noteTime);
       osc.stop(noteTime + 0.2);
     });
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+// Sonido sutil y elegante de notificación de chat estilo burbuja pop
+export function playChatSound() {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    // Subida rápida de frecuencia (pop acuático de 520Hz a 980Hz)
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.exponentialRampToValueAtTime(980, now + 0.08);
+
+    gain.gain.setValueAtTime(0.25 * globalVolume, now);
+    gain.gain.exponentialRampToValueAtTime(0.001 * globalVolume, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.12);
   } catch (e) {
     console.warn(e);
   }
