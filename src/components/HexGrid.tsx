@@ -3,7 +3,7 @@ import { RigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { myPlayer } from "playroomkit";
 import * as THREE from "three";
-import { playBreakSound } from "../utils/sounds";
+// import { playBreakSound } from "../utils/sounds";
 
 export const HEX_RADIUS = 1.0;
 const STEP_DELAY = 500; // 0.5 seconds delay before tile falls
