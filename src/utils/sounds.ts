@@ -172,3 +172,29 @@ export function playChatSound() {
     console.warn(e);
   }
 }
+
+export function playScoreNotificationSound() {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    const notes = [880, 1174.66];
+
+    notes.forEach((frequency, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const noteTime = now + index * 0.09;
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(frequency, noteTime);
+      gain.gain.setValueAtTime(0.22 * globalVolume, noteTime);
+      gain.gain.exponentialRampToValueAtTime(0.001 * globalVolume, noteTime + 0.45);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(noteTime);
+      osc.stop(noteTime + 0.45);
+    });
+  } catch (e) {
+    console.warn("Audio error:", e);
+  }
+}
