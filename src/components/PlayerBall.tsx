@@ -142,7 +142,7 @@ export function PlayerBall({
           rbRef.current.setLinvel({ x: vx, y: vy, z: vz }, true);
         }
 
-        // Turn character mesh in direction of movement
+        // Giro del personaje hacia la dirección de movimiento con alta reactividad
         const moving = Math.abs(vx) > 0.1 || Math.abs(vz) > 0.1;
         const running = moving && isSprinting;
         setIsMoving(moving);
@@ -153,41 +153,40 @@ export function PlayerBall({
         if (moving) {
           const targetAngle = Math.atan2(vx, vz);
           const diff = shortestAngleDiff(targetAngle, visualRef.current.rotation.y);
-          // Smooth rotation along shortest angle path
-          visualRef.current.rotation.y += diff * 0.22;
+          // Giro suave y directo sin desvíos
+          visualRef.current.rotation.y += diff * 0.35;
 
-          // Dynamic banking / tilt into turn
-          const targetTilt = -diff * 0.12;
+          // Inclinación dinámica en curva
+          const targetTilt = Math.max(-0.25, Math.min(0.25, -diff * 0.15));
           visualRef.current.rotation.z = THREE.MathUtils.lerp(
             visualRef.current.rotation.z,
             targetTilt,
-            0.15
+            0.2
           );
         } else {
-          // Reset tilt when standing still
+          // Restablecer inclinación al detenerse
           visualRef.current.rotation.z = THREE.MathUtils.lerp(
             visualRef.current.rotation.z,
             0,
-            0.15
+            0.2
           );
         }
 
-        // Void fall check
+        // Verificación de caída al vacío
         if (translation.y < -8) {
           player.setState("isAlive", false);
           player.setState("isMoving", false);
           player.setState("vel", { x: 0, y: 0, z: 0 });
           rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
           rbRef.current.setTranslation({ x: 0, y: -20, z: 0 }, true);
-          playFallSound(); // Play procedural death sweep
+          playFallSound();
         } else {
-          // Broadcast position & velocity
+          // Sincronizar posición y velocidad
           player.setState("pos", { x: translation.x, y: translation.y, z: translation.z });
           player.setState("vel", { x: vx, y: vy, z: vz });
         }
 
         if (gameStatus === "ROUND_OVER") {
-          // Despawn local player from active field on round end
           rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
           rbRef.current.setTranslation({ x: 0, y: -50, z: 0 }, true);
           smoothCamTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.05);
@@ -198,7 +197,7 @@ export function PlayerBall({
           );
           state.camera.lookAt(0, 0, 0);
         } else {
-          // Stabilized gimbal-style camera follow
+          // Seguimiento de cámara estabilizada en tercera persona
           smoothCamTarget.current.lerp(
             new THREE.Vector3(translation.x, translation.y, translation.z),
             0.08
@@ -216,7 +215,6 @@ export function PlayerBall({
           );
         }
       } else {
-        // Smooth spectate camera
         smoothCamTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.05);
         state.camera.position.set(
           smoothCamTarget.current.x,
@@ -226,7 +224,7 @@ export function PlayerBall({
         state.camera.lookAt(0, 0, 0);
       }
     }
-    // 2. REMOTE PLAYER INTERPOLATION
+    // 2. INTERPOLACIÓN DE JUGADORES REMOTOS
     else {
       const netPos = player.getState("pos");
       const netVel = player.getState("vel");
@@ -263,7 +261,7 @@ export function PlayerBall({
       if (netVel && visualRef.current && (Math.abs(netVel.x) > 0.1 || Math.abs(netVel.z) > 0.1)) {
         const targetAngle = Math.atan2(netVel.x, netVel.z);
         const diff = shortestAngleDiff(targetAngle, visualRef.current.rotation.y);
-        visualRef.current.rotation.y += diff * 0.22;
+        visualRef.current.rotation.y += diff * 0.35;
       }
     }
   });
@@ -283,7 +281,7 @@ export function PlayerBall({
         colliders={false} // Colisionador de cápsula personalizado
         position={[spawnX, spawnY, spawnZ]}
         enabledTranslations={[true, true, true]}
-        enabledRotations={[false, true, false]} // Bloqueo de rotación en X y Z para mantener al personaje erguido
+        enabledRotations={[false, false, false]} // Bloqueo total de rotación física para que el giro visual sea 100% puro y preciso
         userData={userData}
         linearDamping={0.4}
         angularDamping={1.0}
