@@ -4,6 +4,7 @@ import { onPlayerJoin, isHost, setState, getState, RPC, myPlayer } from "playroo
 import { initPlayroom } from "./playroom";
 import { GameScene } from "./components/GameScene";
 import { GameUI } from "./components/GameUI";
+import { LandingPage } from "./components/LandingPage";
 import { playWinSound, playFallSound, playStepSound, setGlobalVolume, getGlobalVolume } from "./utils/sounds";
 import { FPSCounter } from "./components/FPSCounter";
 import { PingCounter } from "./components/PingCounter";
@@ -18,6 +19,11 @@ const keyboardMap = [
 ];
 
 function App() {
+  const initialRoom = typeof window !== "undefined"
+    ? (new URLSearchParams(window.location.search).get("r") || new URLSearchParams(window.location.search).get("room"))
+    : null;
+
+  const [isInGame, setIsInGame] = useState<boolean>(Boolean(initialRoom));
   const [connected, setConnected] = useState(false);
   const [players, setPlayers] = useState<any[]>([]);
   
@@ -36,6 +42,8 @@ function App() {
   const [volume, setVolume] = useState(getGlobalVolume());
 
   useEffect(() => {
+    if (!isInGame) return;
+
     // 1. Initialize Playroom MultiPlayer
     initPlayroom().then(() => {
       setConnected(true);
@@ -239,12 +247,28 @@ function App() {
     setShowPing((prev) => !prev);
   };
 
+  const handleHostGame = () => {
+    setIsInGame(true);
+  };
+
+  const handleJoinGame = (roomCode: string) => {
+    const clean = roomCode.trim();
+    if (!clean) return;
+    const newUrl = `${window.location.origin}${window.location.pathname}?r=${clean}`;
+    window.history.pushState({}, "", newUrl);
+    setIsInGame(true);
+  };
+
+  if (!isInGame) {
+    return <LandingPage onHostGame={handleHostGame} onJoinGame={handleJoinGame} />;
+  }
+
   if (!connected) {
     return (
-      <div className="w-full h-full flex flex-col justify-center items-center bg-[#0d0e12] text-white">
+      <div className="w-full h-full flex flex-col justify-center items-center bg-[#07080b] text-white">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sky-500 mb-4"></div>
-        <h2 className="text-lg font-bold tracking-wide animate-pulse">
-          CONECTANDO CON PLAYROOM KIT...
+        <h2 className="text-sm font-bold tracking-wider uppercase animate-pulse text-white/80">
+          Conectando a la Sala...
         </h2>
       </div>
     );
