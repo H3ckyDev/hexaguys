@@ -24,6 +24,7 @@ export function GameScene({
   floorsCount = 3,
 }: GameSceneProps) {
   const localPlayer = myPlayer();
+  const sortedPlayers = [...players].sort((a, b) => a.id.localeCompare(b.id));
 
   return (
     <div className="w-full h-full relative">
@@ -61,12 +62,12 @@ export function GameScene({
             floorsCount={floorsCount}
           />
           
-          {players.map((p, idx) => (
+          {sortedPlayers.map((p, idx) => (
             <PlayerBall
               key={p.id}
               player={p}
               playerIndex={idx}
-              totalPlayers={players.length}
+              totalPlayers={sortedPlayers.length}
               isLocal={Boolean(localPlayer && p.id === localPlayer.id)}
               gameStatus={gameStatus}
               floorsCount={floorsCount}

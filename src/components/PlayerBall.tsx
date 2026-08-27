@@ -36,7 +36,7 @@ export function PlayerBall({
   // Calculate distinct radial spawn position to guarantee zero collider overlaps on game start
   const total = Math.max(1, totalPlayers);
   const angle = (playerIndex / total) * Math.PI * 2;
-  const spawnDist = total > 1 ? 2.0 : 0;
+  const spawnDist = total > 1 ? 2.4 : 0;
   const spawnX = Math.cos(angle) * spawnDist;
   const spawnZ = Math.sin(angle) * spawnDist;
   const topFloorY = (floorsCount - 1) * 4.5;
