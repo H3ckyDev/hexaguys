@@ -110,10 +110,10 @@ export function PlayerBall({
         const isSprinting = Boolean(keys.sprint);
         const speed = isSprinting ? 6.8 : 3.8;
 
-        // Accept keyboard inputs when game is PLAYING or LOBBY, window is focused, and not typing
-        const hasFocus = typeof document === "undefined" || document.hasFocus();
+        // Accept keyboard inputs when game is PLAYING or LOBBY, window is focused and tab is active, and not typing
+        const isTabActive = typeof document === "undefined" || (document.hasFocus() && document.visibilityState === "visible");
 
-        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && hasFocus && !isTyping) {
+        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && isTabActive && !isTyping) {
           if (keys.forward) vz -= speed;
           if (keys.backward) vz += speed;
           if (keys.left) vx -= speed;
@@ -125,15 +125,15 @@ export function PlayerBall({
           }
         }
 
-        // Jump physics & Sound (active during PLAYING and LOBBY when focused and not typing)
+        // Jump physics & Sound (active during PLAYING and LOBBY when tab active and not typing)
         let vy = linvel.y;
-        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && hasFocus && !isTyping && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
+        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && isTabActive && !isTyping && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
           vy = 8.0; // Balanced jump impulse
           setLastJumpTime(Date.now());
           playJumpSound(); // Play procedural jump synth
         }
 
-        // Apply movement vector with instant braking when keys are released
+        // Apply movement vector with instant braking when keys are released or tab is switched
         if (rbRef.current) {
           if (gameStatus === "PLAYING" || gameStatus === "LOBBY") {
             rbRef.current.setLinvel({ x: vx, y: vy, z: vz }, true);
