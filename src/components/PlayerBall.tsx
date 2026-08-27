@@ -121,7 +121,7 @@ export function PlayerBall({
           if (keys.forward) vz -= speed;
           if (keys.backward) vz += speed;
           if (keys.left) vx -= speed;
-          if (keys.right) vx -= speed;
+          if (keys.right) vx += speed;
 
           // Normalizar movimiento diagonal
           if (vx !== 0 && vz !== 0) {
