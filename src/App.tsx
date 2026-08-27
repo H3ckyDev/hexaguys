@@ -18,6 +18,9 @@ const keyboardMap = [
   { name: "sprint", keys: ["ShiftLeft", "ShiftRight"] },
 ];
 
+const GLOBAL_SCORE_PER_WIN = 10;
+const GLOBAL_SCORE_PER_SURVIVAL_INTERVAL = 3_000;
+
 function getRoomCodeFromUrl(): string | null {
   if (typeof window === "undefined") return null;
   
@@ -171,6 +174,10 @@ function App() {
 
       // Seguimiento de jugadores que se unen/salen
       onPlayerJoin((player) => {
+        if (player.getState("globalScore") === undefined || player.getState("globalScore") === null) {
+          player.setState("globalScore", 0);
+        }
+
         setPlayers((prev) => {
           if (prev.some((p) => p.id === player.id)) return prev;
           return [...prev, player];
@@ -270,7 +277,15 @@ function App() {
           const winner = alive[0];
           setState("status", "ROUND_OVER");
           setState("winnerId", winner.id);
-          winner.setState("score", (winner.getState("score") || 0) + 1);
+          winner.setState(
+            "globalScore",
+            (winner.getState("globalScore") || 0) + GLOBAL_SCORE_PER_WIN,
+          );
+          winner.setState("scoreNotification", {
+            id: `${Date.now()}_${winner.id}`,
+            amount: GLOBAL_SCORE_PER_WIN,
+            timestamp: Date.now(),
+          });
         } else if (players.length === 1 && alive.length === 0) {
           // Muerte en modo individual
           setState("status", "ROUND_OVER");
@@ -278,6 +293,30 @@ function App() {
         }
       }
     }, 1000);
+
+    return () => clearInterval(timer);
+  }, [connected, players]);
+
+  useEffect(() => {
+    if (!connected || !isHost()) return;
+
+    const timer = setInterval(() => {
+      if (getState("status") !== "PLAYING" || getState("winnerId")) return;
+
+      players.forEach((player) => {
+        if (player.getState("isAlive") !== false) {
+          player.setState(
+            "globalScore",
+            (player.getState("globalScore") || 0) + 1,
+          );
+          player.setState("scoreNotification", {
+            id: `${Date.now()}_${player.id}`,
+            amount: 1,
+            timestamp: Date.now(),
+          });
+        }
+      });
+    }, GLOBAL_SCORE_PER_SURVIVAL_INTERVAL);
 
     return () => clearInterval(timer);
   }, [connected, players]);
