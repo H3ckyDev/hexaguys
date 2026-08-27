@@ -384,10 +384,18 @@ export function GameUI({
           </div>
         )}
 
-        {/* Countdown */}
+        {/* Countdown Overlay (5-Second Countdown) */}
         {gameStatus === "COUNTDOWN" && (
-          <div className="ios-glass-panel px-10 py-6 rounded-[40px] text-7xl md:text-8xl font-black text-amber-400 animate-pulse tracking-tight shadow-2xl ring-2 ring-amber-400/40">
-            {countdown}
+          <div className="ios-glass-panel px-8 py-6 rounded-[36px] flex flex-col items-center gap-2 text-white shadow-2xl animate-in zoom-in-95 duration-200 border-amber-400/40">
+            <span className="text-xs font-bold uppercase tracking-widest text-amber-300 animate-pulse">
+              ⚡ ¡Prepárense! La partida inicia en
+            </span>
+            <div className="text-7xl md:text-8xl font-black text-amber-400 font-mono tracking-tight drop-shadow-[0_0_20px_rgba(251,191,36,0.6)]">
+              {countdown}
+            </div>
+            <span className="text-[11px] text-white/60 font-medium">
+              Ubicando jugadores en el primer piso...
+            </span>
           </div>
         )}
 

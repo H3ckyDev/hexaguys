@@ -23,7 +23,7 @@ function App() {
   
   // Local reactive room states synced from Playroom Room State
   const [gameStatus, setGameStatus] = useState<"LOBBY" | "COUNTDOWN" | "PLAYING" | "ROUND_OVER">("LOBBY");
-  const [countdown, setCountdown] = useState(3);
+  const [countdown, setCountdown] = useState(5);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [brokenTiles, setBrokenTiles] = useState<Record<string, number>>({});
   const [mapId, setMapId] = useState("classic");
@@ -40,8 +40,10 @@ function App() {
     initPlayroom().then(() => {
       setConnected(true);
 
-      // Default map & floors selection for host
+      // Default room states for host
       if (isHost()) {
+        if (!getState("status")) setState("status", "LOBBY");
+        if (!getState("countdown")) setState("countdown", 5);
         if (!getState("mapId")) setState("mapId", "classic");
         if (!getState("floorsCount")) setState("floorsCount", 3);
       }
@@ -90,7 +92,7 @@ function App() {
 
     const interval = setInterval(() => {
       setGameStatus(getState("status") || "LOBBY");
-      setCountdown(getState("countdown") ?? 3);
+      setCountdown(getState("countdown") ?? 5);
       setWinnerId(getState("winnerId") || null);
       setBrokenTiles(getState("brokenTiles") || {});
       setMapId(getState("mapId") || "classic");
@@ -132,9 +134,9 @@ function App() {
     const timer = setInterval(() => {
       const status = getState("status") || "LOBBY";
 
-      // A. Countdown tick
+      // A. 5-Second Countdown tick
       if (status === "COUNTDOWN") {
-        const countVal = getState("countdown") ?? 3;
+        const countVal = getState("countdown") ?? 5;
         if (countVal > 1) {
           setState("countdown", countVal - 1);
         } else {
@@ -179,10 +181,10 @@ function App() {
       p.setState("isRunning", false);
     });
 
-    // Reset room state
+    // Reset room state with 5-second countdown
     setState("brokenTiles", {});
     setState("winnerId", null);
-    setState("countdown", 3);
+    setState("countdown", 5);
     setState("status", "COUNTDOWN");
   };
 
@@ -198,7 +200,7 @@ function App() {
 
     setState("brokenTiles", {});
     setState("winnerId", null);
-    setState("countdown", 3);
+    setState("countdown", 5);
     setState("status", "LOBBY");
   };
 
