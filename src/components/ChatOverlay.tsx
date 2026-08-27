@@ -23,30 +23,41 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId }: ChatOver
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastCountRef = useRef(messages.length);
 
-  // Auto-scroll al último mensaje y gestión de contador de no leídos
+  // Función robusta de auto-scroll hacia el último mensaje
+  const scrollToBottom = (instant = false) => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight + 500,
+        behavior: instant ? "auto" : "smooth",
+      });
+    }
+  };
+
+  // Auto-scroll automático cuando llega cualquier mensaje
   useEffect(() => {
     if (messages.length > lastCountRef.current) {
       if (!isOpen) {
         setUnreadCount((prev) => prev + (messages.length - lastCountRef.current));
       } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        requestAnimationFrame(() => scrollToBottom(false));
       }
       lastCountRef.current = messages.length;
     }
   }, [messages, isOpen]);
 
-  // Al abrir el chat, reiniciar contador y enfocar input
+  // Al abrir el chat, reiniciar contador y scrollear de inmediato al final
   useEffect(() => {
     if (isOpen) {
       setUnreadCount(0);
-      setTimeout(() => {
+      requestAnimationFrame(() => {
+        scrollToBottom(true);
         inputRef.current?.focus();
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 50);
+      });
     }
   }, [isOpen]);
 
@@ -62,7 +73,10 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId }: ChatOver
         if (!isOtherInput) {
           e.preventDefault();
           setIsOpen(true);
-          setTimeout(() => inputRef.current?.focus(), 50);
+          requestAnimationFrame(() => {
+            scrollToBottom(true);
+            inputRef.current?.focus();
+          });
         }
       }
     };
@@ -79,20 +93,20 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId }: ChatOver
     setInputText("");
     playStepSound();
 
-    // Mantener el foco en el input para seguir escribiendo
-    setTimeout(() => {
+    // Auto-scroll inmediato al enviar
+    requestAnimationFrame(() => {
+      scrollToBottom(false);
       inputRef.current?.focus();
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 20);
+    });
   };
 
   const handleQuickEmoji = (emoji: string) => {
     onSendMessage(emoji);
     playStepSound();
-    setTimeout(() => {
+    requestAnimationFrame(() => {
+      scrollToBottom(false);
       inputRef.current?.focus();
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 20);
+    });
   };
 
   const formatTime = (time: number) => {
@@ -126,7 +140,10 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId }: ChatOver
           </div>
 
           {/* Historial de Mensajes con Scroll */}
-          <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1 text-xs custom-scrollbar">
+          <div
+            ref={messagesContainerRef}
+            className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1 text-xs custom-scrollbar scroll-smooth"
+          >
             {messages.length === 0 ? (
               <div className="py-6 text-center text-white/40 text-[11px] italic">
                 ¡Sé el primero en enviar un mensaje o reacción!

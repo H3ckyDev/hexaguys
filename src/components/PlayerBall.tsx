@@ -423,7 +423,7 @@ export function PlayerBall({
                 {showPlayerPing && (
                   <span className="text-[9px] text-sky-300 font-mono bg-sky-950/80 px-1 py-0.2 rounded border border-sky-400/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
-                    {player.getState("ping") || (isLocal ? 24 : 32)}ms
+                    {player.getState("ping") ?? 0}ms
                   </span>
                 )}
                 <span className="text-[9px] text-slate-400 capitalize bg-slate-800 px-1 rounded">
