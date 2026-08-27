@@ -36,11 +36,11 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
 
     if (remaining <= 0) {
       setIsBroken(true);
-      playBreakSound();
+      // playBreakSound();
     } else {
       const timer = setTimeout(() => {
         setIsBroken(true);
-        playBreakSound();
+        // playBreakSound();
       }, remaining);
       return () => clearTimeout(timer);
     }
