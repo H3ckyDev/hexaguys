@@ -242,7 +242,7 @@ export function GameUI({
               const isAlive = p.getState("isAlive") !== false;
               const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
               const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0a84ff";
-              const score = p.getState("score") || 0;
+              const score = p.getState("globalScore") || 0;
               const skin = p.getState("skin");
               
               const hasSelected = skin !== undefined && skin !== null;

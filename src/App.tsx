@@ -18,6 +18,8 @@ const keyboardMap = [
   { name: "sprint", keys: ["ShiftLeft", "ShiftRight"] },
 ];
 
+const GLOBAL_SCORE_PER_WIN = 10;
+
 function getRoomCodeFromUrl(): string | null {
   if (typeof window === "undefined") return null;
   
@@ -171,6 +173,10 @@ function App() {
 
       // Seguimiento de jugadores que se unen/salen
       onPlayerJoin((player) => {
+        if (player.getState("globalScore") === undefined || player.getState("globalScore") === null) {
+          player.setState("globalScore", 0);
+        }
+
         setPlayers((prev) => {
           if (prev.some((p) => p.id === player.id)) return prev;
           return [...prev, player];
@@ -270,7 +276,10 @@ function App() {
           const winner = alive[0];
           setState("status", "ROUND_OVER");
           setState("winnerId", winner.id);
-          winner.setState("score", (winner.getState("score") || 0) + 1);
+          winner.setState(
+            "globalScore",
+            (winner.getState("globalScore") || 0) + GLOBAL_SCORE_PER_WIN,
+          );
         } else if (players.length === 1 && alive.length === 0) {
           // Muerte en modo individual
           setState("status", "ROUND_OVER");
