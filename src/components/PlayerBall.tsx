@@ -57,28 +57,31 @@ export function PlayerBall({
   // Fetch skin from playroom state (default to robot if not chosen)
   const skinType = player.getState("skin") || "robot";
 
-  // Restablecer posición del jugador de forma segura al iniciar la cuenta regresiva o al volver al Lobby
+  // Restablecer posición del jugador de forma segura solo al volver al Lobby si estaba caído
   useEffect(() => {
-    if (isLocal && (gameStatus === "COUNTDOWN" || gameStatus === "LOBBY")) {
-      smoothCamTarget.current.set(spawnX, spawnY, spawnZ);
-      player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
-      player.setState("vel", { x: 0, y: 0, z: 0 });
-      player.setState("isAlive", true);
-      player.setState("isMoving", false);
-      player.setState("isRunning", false);
-      
-      if (rbRef.current) {
-        rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
-        rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    if (isLocal && gameStatus === "LOBBY") {
+      const translation = rbRef.current?.translation();
+      if (!player.getState("isAlive") || (translation && translation.y < topFloorY - 2.0)) {
+        smoothCamTarget.current.set(spawnX, spawnY, spawnZ);
+        player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
+        player.setState("vel", { x: 0, y: 0, z: 0 });
+        player.setState("isAlive", true);
+        player.setState("isMoving", false);
+        player.setState("isRunning", false);
+        
+        if (rbRef.current) {
+          rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
+          rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        }
       }
     }
-  }, [gameStatus, isLocal, player, spawnX, spawnY, spawnZ]);
+  }, [gameStatus, isLocal, player, spawnX, spawnY, spawnZ, topFloorY]);
 
   const userData = { type: "player", playerId: player.id };
 
   useFrame((state) => {
-    // 1. LOCAL PLAYER CONTROLLER
+    // 1. CONTROLADOR DE JUGADOR LOCAL
     if (isLocal) {
       if (!rbRef.current || !visualRef.current) return;
 
@@ -87,66 +90,56 @@ export function PlayerBall({
       const translation = rbRef.current.translation();
       const isAlive = player.getState("isAlive") !== false;
 
-      // Ground check based on Y velocity and translation height
+      // Verificación de suelo basada en velocidad Y
       const grounded = Math.abs(linvel.y) < 0.35;
       setIsGrounded(grounded);
 
-      // Auto-respawn in LOBBY if player jumps off the edge
-      if (gameStatus === "LOBBY" && translation.y < topFloorY - 1.5) {
+      // Auto-reaparición en LOBBY o COUNTDOWN si cae por el borde
+      if ((gameStatus === "LOBBY" || gameStatus === "COUNTDOWN") && translation.y < topFloorY - 1.5) {
         rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
         rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
       }
 
       if (isAlive) {
-        // Check if user is currently typing in an input field (e.g. Nickname or Room Code)
+        // Comprobar si el usuario está escribiendo en algún input de texto
         const isTyping = typeof document !== "undefined" && (
           document.activeElement instanceof HTMLInputElement ||
           document.activeElement instanceof HTMLTextAreaElement
         );
 
-        // Keyboard inputs (active during PLAYING and LOBBY practice only when not typing)
+        // Movimiento activo en PLAYING, LOBBY y COUNTDOWN
         let vx = 0;
         let vz = 0;
         
-        // Walk (3.8) by default; Sprint (6.8) when holding Shift
         const isSprinting = Boolean(keys.sprint);
         const speed = isSprinting ? 6.8 : 3.8;
 
-        // Accept keyboard inputs when game is PLAYING or LOBBY, window is focused and tab is active, and not typing
         const isTabActive = typeof document === "undefined" || (document.hasFocus() && document.visibilityState === "visible");
+        const canMove = (gameStatus === "PLAYING" || gameStatus === "LOBBY" || gameStatus === "COUNTDOWN") && isTabActive && !isTyping;
 
-        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && isTabActive && !isTyping) {
+        if (canMove) {
           if (keys.forward) vz -= speed;
           if (keys.backward) vz += speed;
           if (keys.left) vx -= speed;
-          if (keys.right) vx += speed;
+          if (keys.right) vx -= speed;
 
-          // Normalize diagonal movement so player doesn't move faster diagonally
+          // Normalizar movimiento diagonal
           if (vx !== 0 && vz !== 0) {
             vx *= 0.7071;
           }
         }
 
-        // Jump physics & Sound (active during PLAYING and LOBBY when tab active and not typing)
+        // Físicas de salto
         let vy = linvel.y;
-        if ((gameStatus === "PLAYING" || gameStatus === "LOBBY") && isTabActive && !isTyping && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
-          vy = 8.0; // Balanced jump impulse
+        if (canMove && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
+          vy = 8.0;
           setLastJumpTime(Date.now());
-          playJumpSound(); // Play procedural jump synth
+          playJumpSound();
         }
 
-        // Apply movement vector with instant braking when keys are released or tab is switched
+        // Aplicar vector de velocidad con frenado instantáneo al soltar teclas
         if (rbRef.current) {
-          if (gameStatus === "PLAYING" || gameStatus === "LOBBY") {
-            rbRef.current.setLinvel({ x: vx, y: vy, z: vz }, true);
-          } else if (gameStatus === "COUNTDOWN") {
-            // Strictly anchor at first (top) floor spawn coordinates during countdown
-            rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-            rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
-            player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
-            player.setState("vel", { x: 0, y: 0, z: 0 });
-            player.setState("isAlive", true);
-          }
+          rbRef.current.setLinvel({ x: vx, y: vy, z: vz }, true);
         }
 
         // Turn character mesh in direction of movement
@@ -251,20 +244,6 @@ export function PlayerBall({
         return;
       }
 
-      if (gameStatus === "COUNTDOWN") {
-        if (rbRef.current) {
-          rbRef.current.setNextKinematicTranslation({
-            x: spawnX,
-            y: spawnY,
-            z: spawnZ,
-          });
-        }
-        setIsMoving(false);
-        setIsRunning(false);
-        setIsGrounded(true);
-        return;
-      }
-
       if (netPos && rbRef.current) {
         const nextX = THREE.MathUtils.lerp(rbRef.current.translation().x, netPos.x, 0.25);
         const nextY = THREE.MathUtils.lerp(rbRef.current.translation().y, netPos.y, 0.25);
@@ -276,11 +255,11 @@ export function PlayerBall({
           z: nextZ,
         });
 
-        // Set grounded based on remote Y velocity
+        // Estado de suelo para jugadores remotos
         setIsGrounded(netVel ? Math.abs(netVel.y) < 0.35 : true);
       }
 
-      // Smooth rotation for remote players
+      // Rotación suave para jugadores remotos
       if (netVel && visualRef.current && (Math.abs(netVel.x) > 0.1 || Math.abs(netVel.z) > 0.1)) {
         const targetAngle = Math.atan2(netVel.x, netVel.z);
         const diff = shortestAngleDiff(targetAngle, visualRef.current.rotation.y);
@@ -300,7 +279,7 @@ export function PlayerBall({
     <group>
       <RigidBody
         ref={rbRef}
-        type={isLocal ? (gameStatus === "COUNTDOWN" ? "fixed" : "dynamic") : "kinematicPosition"}
+        type={isLocal ? "dynamic" : "kinematicPosition"}
         colliders={false} // Colisionador de cápsula personalizado
         position={[spawnX, spawnY, spawnZ]}
         enabledTranslations={[true, true, true]}

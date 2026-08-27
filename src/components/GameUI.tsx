@@ -430,8 +430,8 @@ export function GameUI({
             <div className="text-7xl md:text-8xl font-black text-amber-400 font-mono tracking-tight drop-shadow-[0_0_20px_rgba(251,191,36,0.6)]">
               {countdown}
             </div>
-            <span className="text-[11px] text-white/60 font-medium">
-              Ubicando jugadores en el primer piso...
+            <span className="text-[11px] text-white/70 font-medium">
+              ¡Manténganse en movimiento!
             </span>
           </div>
         )}

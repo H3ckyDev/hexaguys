@@ -164,7 +164,8 @@ interface HexGridProps {
 
 export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
   const [tiles, setTiles] = useState<any[]>([]);
-  const isLobby = gameStatus === "LOBBY";
+  // El piso del lobby y los muros de protección se mantienen activos en LOBBY y durante el COUNTDOWN de 5s
+  const isLobby = gameStatus === "LOBBY" || gameStatus === "COUNTDOWN";
   const floorDistance = 4.5;
   const topFloorY = (floorsCount - 1) * floorDistance;
 
