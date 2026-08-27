@@ -3,7 +3,7 @@ import { RigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { myPlayer } from "playroomkit";
 import * as THREE from "three";
-// import { playBreakSound } from "../utils/sounds";
+import { playBreakSound } from "../utils/sounds";
 
 export const HEX_RADIUS = 1.0;
 const STEP_DELAY = 500; // 0.5 seconds delay before tile falls
@@ -36,11 +36,11 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
 
     if (remaining <= 0) {
       setIsBroken(true);
-      // playBreakSound();
+      playBreakSound();
     } else {
       const timer = setTimeout(() => {
         setIsBroken(true);
-        // playBreakSound();
+        playBreakSound();
       }, remaining);
       return () => clearTimeout(timer);
     }
