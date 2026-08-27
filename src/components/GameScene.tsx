@@ -3,6 +3,7 @@ import { Physics } from "@react-three/rapier";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
 import { HexGrid } from "./HexGrid";
+import { CardboardBoxLobby } from "./CardboardBoxLobby";
 import { PlayerBall } from "./PlayerBall";
 import { myPlayer } from "playroomkit";
 
@@ -32,31 +33,35 @@ export function GameScene({
     <div className="w-full h-full relative">
       <Canvas
         shadows={{ type: THREE.PCFShadowMap }}
-        camera={{ position: [0, 15, 18], fov: 45 }}
+        camera={{ position: [60, 10, 15], fov: 45 }}
         gl={{ antialias: true }}
       >
         <color attach="background" args={["#0d0e12"]} />
-        <fog attach="fog" args={["#0d0e12", 15, 30]} />
-        <Stars radius={100} depth={50} count={3500} factor={4} saturation={0.5} fade speed={1.5} />
+        <fog attach="fog" args={["#0d0e12", 60, 180]} />
+        <Stars radius={120} depth={60} count={3500} factor={4} saturation={0.5} fade speed={1.5} />
 
-        {/* Lighting */}
-        <ambientLight intensity={0.7} />
+        {/* Iluminación global */}
+        <ambientLight intensity={1.0} />
         <directionalLight
           castShadow
-          position={[10, 20, 10]}
-          intensity={1.5}
+          position={[10, 25, 15]}
+          intensity={1.4}
           shadow-mapSize-width={1024}
           shadow-mapSize-height={1024}
-          shadow-camera-far={50}
-          shadow-camera-left={-15}
-          shadow-camera-right={15}
-          shadow-camera-top={15}
-          shadow-camera-bottom={-15}
+          shadow-camera-far={60}
+          shadow-camera-left={-20}
+          shadow-camera-right={20}
+          shadow-camera-top={20}
+          shadow-camera-bottom={-20}
         />
-        <pointLight position={[-10, 10, -10]} intensity={0.5} />
+        <pointLight position={[-10, 15, -10]} intensity={0.6} />
 
-        {/* Game World Physics */}
+        {/* Físicas del mundo 3D */}
         <Physics gravity={[0, -20, 0]}>
+          {/* 1. Sala de Espera: Caja de Cartón 3D (Ubicada en X=60, separada de la torre) */}
+          <CardboardBoxLobby position={[60, 0, 0]} />
+
+          {/* 2. Torres de Juego Hexagonales (Ubicadas en X=0, Y=0) */}
           <HexGrid
             brokenTiles={brokenTiles}
             onStep={onStepTile}
@@ -65,6 +70,7 @@ export function GameScene({
             gameStatus={gameStatus}
           />
           
+          {/* 3. Jugadores 3D */}
           {sortedPlayers.map((p, idx) => (
             <PlayerBall
               key={p.id}
@@ -79,8 +85,9 @@ export function GameScene({
           ))}
         </Physics>
 
-        {/* Visual ocean/bottom plane grid far below */}
+        {/* Rejillas visuales de referencia en la base */}
         <gridHelper args={[60, 60, "#1e293b", "#0f172a"]} position={[0, -8, 0]} />
+        <gridHelper args={[30, 30, "#27272a", "#18181b"]} position={[60, -0.2, 0]} />
       </Canvas>
     </div>
   );
