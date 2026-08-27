@@ -399,44 +399,12 @@ export function GameUI({
           </div>
         )}
 
-        {/* Interactive Floating 3D Lobby UI */}
+        {/* Interactive Floating 3D Lobby UI - Fixed at Bottom Center */}
         {gameStatus === "LOBBY" && !showSettings && (
-          <div className="w-full flex flex-col items-center gap-4 pointer-events-none">
-            {/* Top Lobby Floating Hub */}
-            <div className="ios-glass-panel px-4 py-2 rounded-full flex items-center gap-2.5 pointer-events-auto shadow-2xl animate-in slide-in-from-top duration-300">
-              <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
-                Lobby {getRoomCode() ? `• Sala: ${getRoomCode()}` : ""}
-              </span>
-
-              <span className="w-[1px] h-3 bg-white/20" />
-
-              <button
-                onClick={handleCopyLink}
-                className="ios-btn-secondary px-3 py-1 rounded-full text-xs font-semibold text-sky-300 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 hover:bg-sky-500/20"
-                title="Copiar enlace directo a la sala"
-              >
-                <span>📋</span>
-                <span>Copiar Link</span>
-              </button>
-
-              <span className="w-[1px] h-3 bg-white/20" />
-
-              <button
-                onClick={() => {
-                  playStepSound();
-                  setShowLobbyCustomizer((prev) => !prev);
-                }}
-                className="ios-btn-secondary px-3 py-1 rounded-full text-xs font-semibold text-white/90 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-              >
-                <span>🎨</span>
-                <span>{showLobbyCustomizer ? "Cerrar Ajustes" : "Personalizar"}</span>
-              </button>
-            </div>
-
-            {/* Floating Customizer Glass Panel (Open on demand) */}
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-30 pointer-events-none w-full max-w-xl px-4 animate-in slide-in-from-bottom duration-300">
+            {/* Floating Customizer Glass Panel (Opens upwards on demand) */}
             {showLobbyCustomizer && (
-              <div className="ios-glass-panel p-6 rounded-[32px] flex flex-col gap-4 max-w-lg w-full text-white pointer-events-auto shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="ios-glass-panel p-5 md:p-6 rounded-[32px] flex flex-col gap-4 max-w-lg w-full text-white pointer-events-auto shadow-2xl animate-in zoom-in-95 duration-200 mb-2 border border-white/20">
                 <div className="flex justify-between items-center pb-1 border-b border-white/10">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
                     <span>🎨</span> Personalización de Personaje
@@ -566,8 +534,28 @@ export function GameUI({
               </div>
             )}
 
-            {/* Bottom Play Action (Host vs Guest) */}
-            <div className="pointer-events-auto mt-2">
+            {/* Bottom Dock: Room Badge + Customize + Play Button */}
+            <div className="flex flex-wrap items-center justify-center gap-2.5 pointer-events-auto">
+              <div className="ios-glass-panel px-4 py-2 rounded-full flex items-center gap-2.5 shadow-2xl">
+                <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                  Lobby {getRoomCode() ? `• Sala: ${getRoomCode()}` : ""}
+                </span>
+
+                <span className="w-[1px] h-3 bg-white/20" />
+
+                <button
+                  onClick={() => {
+                    playStepSound();
+                    setShowLobbyCustomizer((prev) => !prev);
+                  }}
+                  className="ios-btn-secondary px-3 py-1 rounded-full text-xs font-semibold text-white/90 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 hover:bg-white/15"
+                >
+                  <span>🎨</span>
+                  <span>{showLobbyCustomizer ? "Cerrar" : "Personalizar"}</span>
+                </button>
+              </div>
+
               {host ? (
                 <button
                   onClick={() => {
@@ -576,15 +564,15 @@ export function GameUI({
                     }
                     onStartGame();
                   }}
-                  className="ios-btn-primary px-8 py-3.5 rounded-2xl text-xs uppercase font-extrabold tracking-wider text-white shadow-2xl flex items-center gap-2.5 cursor-pointer active:scale-95 hover:scale-102 transition-all ring-2 ring-sky-400/40"
+                  className="ios-btn-primary px-6 py-2.5 rounded-full text-xs uppercase font-extrabold tracking-wider text-white shadow-2xl flex items-center gap-2 cursor-pointer active:scale-95 hover:scale-102 transition-all ring-2 ring-sky-400/40"
                 >
-                  <span className="text-base">🚀</span>
+                  <span className="text-sm">🚀</span>
                   <span>Comenzar Partida</span>
                 </button>
               ) : (
-                <div className="ios-pill px-6 py-2.5 rounded-full text-amber-300 text-xs font-semibold flex items-center gap-2 shadow-xl animate-pulse">
+                <div className="ios-pill px-5 py-2 rounded-full text-amber-300 text-xs font-semibold flex items-center gap-2 shadow-xl animate-pulse">
                   <span>⏳</span>
-                  <span>Esperando a que el Anfitrión inicie la partida...</span>
+                  <span>Esperando al anfitrión...</span>
                 </div>
               )}
             </div>
