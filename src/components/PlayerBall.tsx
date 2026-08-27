@@ -57,9 +57,9 @@ export function PlayerBall({
   // Fetch skin from playroom state (default to robot if not chosen)
   const skinType = player.getState("skin") || "robot";
 
-  // Reset player position safely on countdown start
+  // Restablecer posición del jugador de forma segura al iniciar la cuenta regresiva o al volver al Lobby
   useEffect(() => {
-    if (isLocal && gameStatus === "COUNTDOWN") {
+    if (isLocal && (gameStatus === "COUNTDOWN" || gameStatus === "LOBBY")) {
       smoothCamTarget.current.set(spawnX, spawnY, spawnZ);
       player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });

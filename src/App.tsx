@@ -270,20 +270,25 @@ function App() {
     setState("status", "COUNTDOWN");
   };
 
-  // Handle returning to Lobby (Host only)
+  // Retornar a la sala de espera (Lobby)
   const handleReturnToLobby = () => {
-    if (!isHost()) return;
+    if (isHost()) {
+      players.forEach((p) => {
+        p.setState("isAlive", true);
+        p.setState("isMoving", false);
+        p.setState("isRunning", false);
+      });
 
-    players.forEach((p) => {
-      p.setState("isAlive", true);
-      p.setState("isMoving", false);
-      p.setState("isRunning", false);
-    });
+      setState("brokenTiles", {});
+      setState("winnerId", null);
+      setState("countdown", 5);
+      setState("status", "LOBBY");
+    }
 
-    setState("brokenTiles", {});
-    setState("winnerId", null);
-    setState("countdown", 5);
-    setState("status", "LOBBY");
+    // Actualización inmediata del estado local reactivo
+    setGameStatus("LOBBY");
+    setBrokenTiles({});
+    setWinnerId(null);
   };
 
   const handleSelectMap = (newMapId: string) => {
@@ -299,8 +304,7 @@ function App() {
   };
 
   const handleStepTile = (tileId: string) => {
-    playStepSound(); // Play procedural step beep locally
-    // Broadcast tile step event to the host
+    // Solo se emite el colapso al anfitrión sin reproducir sonido de paso
     RPC.call("stepOnTile", tileId, RPC.Mode.HOST);
   };
 
