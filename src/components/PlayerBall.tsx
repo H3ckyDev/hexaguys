@@ -4,6 +4,7 @@ import { RigidBody, RapierRigidBody, CapsuleCollider } from "@react-three/rapier
 import { useKeyboardControls, Html } from "@react-three/drei";
 import { CharacterModel } from "./CharacterModel";
 import { playJumpSound, playFallSound } from "../utils/sounds";
+import { RPC } from "playroomkit";
 import * as THREE from "three";
 
 function shortestAngleDiff(target: number, current: number) {
@@ -78,15 +79,17 @@ export function PlayerBall({
     }
   }, [gameStatus, isLocal, player, spawnX, spawnY, spawnZ, topFloorY]);
 
-  // Detección de inactividad (AFK / Pestaña en segundo plano)
+  // Detección de inactividad (AFK / Pestaña en segundo plano) y expulsión tras 60s
   useEffect(() => {
     if (!isLocal || !player) return;
 
     let lastActivity = Date.now();
     let isCurrentlyAfk = false;
+    let afkStartTime = 0;
 
     const handleActivity = () => {
       lastActivity = Date.now();
+      afkStartTime = 0;
       if (isCurrentlyAfk) {
         isCurrentlyAfk = false;
         player.setState("isAfk", false);
@@ -95,14 +98,40 @@ export function PlayerBall({
 
     const interval = setInterval(() => {
       const isHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
-      const isInactive = Date.now() - lastActivity > 20000; // 20 segundos sin interacción
+      const isInactive = Date.now() - lastActivity > 20000; // 20 segundos sin interacción para marcar AFK
 
       const shouldBeAfk = isHidden || isInactive;
       if (shouldBeAfk !== isCurrentlyAfk) {
         isCurrentlyAfk = shouldBeAfk;
         player.setState("isAfk", shouldBeAfk);
+        if (shouldBeAfk) {
+          afkStartTime = Date.now();
+        } else {
+          afkStartTime = 0;
+        }
       }
-    }, 1500);
+
+      // Expulsión automática al menú tras 60 segundos continuos de inactividad en el Lobby
+      if (gameStatus === "LOBBY" && shouldBeAfk && afkStartTime > 0 && Date.now() - afkStartTime > 60000) {
+        const pName = player.getState("name") || player.getProfile()?.name || "Jugador";
+        // Difundir notificación de desconexión por inactividad
+        try {
+          RPC.call("chatMessage", {
+            id: `msg_kick_${Date.now()}`,
+            senderId: "system",
+            senderName: "Sistema",
+            senderColor: "#f43f5e",
+            text: `🚪 ${pName} fue desconectado por inactividad prolongada (60s).`,
+            timestamp: Date.now(),
+          }, RPC.Mode.ALL);
+        } catch {
+          // Continuar con la desconexión
+        }
+
+        // Redirigir al menú principal con aviso
+        window.location.href = `${window.location.origin}${window.location.pathname}?kick=afk`;
+      }
+    }, 1000);
 
     window.addEventListener("mousemove", handleActivity);
     window.addEventListener("keydown", handleActivity);
@@ -118,7 +147,7 @@ export function PlayerBall({
       window.removeEventListener("focus", handleActivity);
       window.removeEventListener("visibilitychange", handleActivity);
     };
-  }, [isLocal, player]);
+  }, [isLocal, player, gameStatus]);
 
   const userData = { type: "player", playerId: player.id };
 

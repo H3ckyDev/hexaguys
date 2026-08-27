@@ -62,9 +62,24 @@ function App() {
   const [showPing, setShowPing] = useState(true);
   const [showPlayerPing, setShowPlayerPing] = useState(false);
   const [volume, setVolume] = useState(getGlobalVolume());
+  const [afkKickNotice, setAfkKickNotice] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("kick") === "afk") {
+        return "Has sido desconectado de la sala por inactividad prolongada (60 segundos).";
+      }
+    }
+    return null;
+  });
 
-  // Listen to browser navigation changes (e.g. back/forward or link paste)
+  // Escuchar cambios de navegación en el navegador
   useEffect(() => {
+    // Limpiar parámetro de kick en la URL si existe
+    if (typeof window !== "undefined" && window.location.search.includes("kick=afk")) {
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+
     const handlePopState = () => {
       const room = getRoomCodeFromUrl();
       if (room) {
@@ -382,7 +397,14 @@ function App() {
   };
 
   if (!isInGame) {
-    return <LandingPage onHostGame={handleHostGame} onJoinGame={handleJoinGame} />;
+    return (
+      <LandingPage
+        onHostGame={handleHostGame}
+        onJoinGame={handleJoinGame}
+        afkKickNotice={afkKickNotice}
+        onDismissNotice={() => setAfkKickNotice(null)}
+      />
+    );
   }
 
   if (!connected) {

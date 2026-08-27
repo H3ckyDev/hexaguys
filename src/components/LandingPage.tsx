@@ -4,9 +4,11 @@ import { playStepSound } from "../utils/sounds";
 interface LandingPageProps {
   onHostGame: () => void;
   onJoinGame: (roomCode: string) => void;
+  afkKickNotice?: string | null;
+  onDismissNotice?: () => void;
 }
 
-export function LandingPage({ onHostGame, onJoinGame }: LandingPageProps) {
+export function LandingPage({ onHostGame, onJoinGame, afkKickNotice, onDismissNotice }: LandingPageProps) {
   const [roomInput, setRoomInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -20,7 +22,7 @@ export function LandingPage({ onHostGame, onJoinGame }: LandingPageProps) {
 
     playStepSound();
 
-    // Check if user pasted a full URL (e.g. https://domain.com/?r=abcd)
+    // Comprobar si el usuario pegó un enlace completo con parámetros
     let code = raw;
     if (raw.includes("?r=")) {
       const match = raw.match(/[?&]r=([^&]+)/);
@@ -39,10 +41,10 @@ export function LandingPage({ onHostGame, onJoinGame }: LandingPageProps) {
 
   return (
     <div className="w-full h-full min-h-screen bg-[#07080b] text-white flex flex-col justify-between items-center p-6 md:p-10 relative overflow-y-auto font-sans select-none">
-      {/* Background Ambient Glows */}
+      {/* Resplandores ambientales de fondo */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-sky-600/20 via-indigo-600/20 to-pink-600/20 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Header Brand */}
+      {/* Encabezado principal */}
       <header className="w-full max-w-4xl flex justify-between items-center relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400 via-indigo-500 to-pink-500 flex items-center justify-center font-black text-white shadow-xl text-base ring-1 ring-white/30">
@@ -69,9 +71,27 @@ export function LandingPage({ onHostGame, onJoinGame }: LandingPageProps) {
         </a>
       </header>
 
-      {/* Main Hero Card */}
+      {/* Tarjeta Hero Principal */}
       <main className="w-full max-w-xl my-auto py-8 relative z-10 flex flex-col items-center gap-6 text-center">
-        {/* Title Badge */}
+        {/* Banner de aviso por desconexión de inactividad AFK */}
+        {afkKickNotice && (
+          <div className="w-full p-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center justify-between gap-3 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">💤</span>
+              <span className="text-left leading-relaxed">{afkKickNotice}</span>
+            </div>
+            {onDismissNotice && (
+              <button
+                onClick={onDismissNotice}
+                className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Insignia de Título */}
         <div className="flex flex-col items-center gap-3">
           <span className="text-[11px] font-bold uppercase tracking-widest text-sky-400 px-3.5 py-1 rounded-full bg-sky-400/10 border border-sky-400/20 shadow-sm">
             ✨ Plataforma Hexagonal de Supervivencia
