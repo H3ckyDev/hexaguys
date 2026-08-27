@@ -79,7 +79,7 @@ export function PlayerBall({
     }
   }, [gameStatus, isLocal, player, spawnX, spawnY, spawnZ, topFloorY]);
 
-  // Detección de inactividad (AFK / Pestaña en segundo plano) y expulsión tras 60s
+  // Detección de inactividad (AFK / Pestaña en segundo plano) y expulsión tras 60s (Se ignora si está chateando)
   useEffect(() => {
     if (!isLocal || !player) return;
 
@@ -97,6 +97,23 @@ export function PlayerBall({
     };
 
     const interval = setInterval(() => {
+      // Comprobar si el usuario está chateando o escribiendo en algún campo de texto
+      const isTyping = typeof document !== "undefined" && (
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement
+      );
+
+      // Si el usuario está chateando o tiene el foco en el chat, se considera activo al 100%
+      if (isTyping) {
+        lastActivity = Date.now();
+        afkStartTime = 0;
+        if (isCurrentlyAfk) {
+          isCurrentlyAfk = false;
+          player.setState("isAfk", false);
+        }
+        return;
+      }
+
       const isHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
       const isInactive = Date.now() - lastActivity > 20000; // 20 segundos sin interacción para marcar AFK
 
@@ -111,8 +128,8 @@ export function PlayerBall({
         }
       }
 
-      // Expulsión automática al menú tras 60 segundos continuos de inactividad en el Lobby
-      if (gameStatus === "LOBBY" && shouldBeAfk && afkStartTime > 0 && Date.now() - afkStartTime > 60000) {
+      // Expulsión automática al menú tras 60 segundos continuos de inactividad en el Lobby (nunca si está chateando)
+      if (gameStatus === "LOBBY" && shouldBeAfk && !isTyping && afkStartTime > 0 && Date.now() - afkStartTime > 60000) {
         const pName = player.getState("name") || player.getProfile()?.name || "Jugador";
         // Difundir notificación de desconexión por inactividad
         try {
@@ -135,6 +152,8 @@ export function PlayerBall({
 
     window.addEventListener("mousemove", handleActivity);
     window.addEventListener("keydown", handleActivity);
+    window.addEventListener("input", handleActivity);
+    window.addEventListener("click", handleActivity);
     window.addEventListener("touchstart", handleActivity);
     window.addEventListener("focus", handleActivity);
     window.addEventListener("visibilitychange", handleActivity);
@@ -143,6 +162,8 @@ export function PlayerBall({
       clearInterval(interval);
       window.removeEventListener("mousemove", handleActivity);
       window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("input", handleActivity);
+      window.removeEventListener("click", handleActivity);
       window.removeEventListener("touchstart", handleActivity);
       window.removeEventListener("focus", handleActivity);
       window.removeEventListener("visibilitychange", handleActivity);
