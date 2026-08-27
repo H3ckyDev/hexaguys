@@ -12,6 +12,7 @@ interface GameUIProps {
   onSelectMap: (mapId: string) => void;
   onSelectFloors: (count: number) => void;
   onStartGame: () => void;
+  onReturnToLobby?: () => void;
   // Settings props
   showSettings: boolean;
   onToggleSettings: () => void;
@@ -44,6 +45,7 @@ export function GameUI({
   onSelectMap,
   onSelectFloors,
   onStartGame,
+  onReturnToLobby,
   showSettings,
   onToggleSettings,
   showFps,
@@ -56,6 +58,7 @@ export function GameUI({
   const alivePlayers = players.filter((p) => p.getState("isAlive") !== false);
   const host = isHost();
   const localPlayer = myPlayer();
+  const [showCustomizerInEnd, setShowCustomizerInEnd] = useState(false);
   
   const currentSkin = localPlayer?.getState("skin");
   const currentColor = localPlayer?.getState("color") || localPlayer?.getProfile()?.color?.hex || COLOR_PALETTE[0].hex;
@@ -607,45 +610,209 @@ export function GameUI({
 
         {/* Round Over Overlay */}
         {gameStatus === "ROUND_OVER" && !showSettings && (
-          <div className="ios-glass-panel p-8 rounded-[36px] flex flex-col items-center gap-5 max-w-sm text-center animate-in zoom-in-95 duration-200 text-white">
-            <div className="w-14 h-14 rounded-3xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-3xl shadow-lg">
+          <div className="ios-glass-panel p-6 md:p-8 rounded-[36px] flex flex-col items-center gap-4 max-w-md w-full text-center animate-in zoom-in-95 duration-200 text-white max-h-[85vh] overflow-y-auto">
+            <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-2xl shadow-lg">
               👑
             </div>
             <div>
-              <h3 className="text-2xl font-black tracking-tight text-white">
+              <h3 className="text-xl font-black tracking-tight text-white">
                 ¡Ronda Finalizada!
               </h3>
               <p className="text-white/50 text-xs mt-0.5">Resultados de la partida</p>
             </div>
             
-            <div className="ios-glass-card p-4 rounded-2xl flex flex-col items-center gap-2 w-full">
+            {/* Winner Card */}
+            <div className="ios-glass-card p-3.5 rounded-2xl flex flex-col items-center gap-1.5 w-full">
               <span className="text-white/50 text-[10px] font-bold uppercase tracking-wider">
-                Ganador
+                Ganador de la Ronda
               </span>
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
                 <span
-                  className="w-4 h-4 rounded-full ring-2 ring-white/30 shadow"
+                  className="w-3.5 h-3.5 rounded-full ring-2 ring-white/30 shadow"
                   style={{ backgroundColor: getWinnerColor() }}
                 />
-                <span className="text-lg font-bold text-white">{getWinnerName()}</span>
+                <span className="text-base font-bold text-white">{getWinnerName()}</span>
               </div>
             </div>
 
-            <div className="w-full flex flex-col gap-2.5">
+            {/* Inline Customizer Toggle */}
+            <button
+              onClick={() => {
+                setShowCustomizerInEnd((prev) => !prev);
+                playStepSound();
+              }}
+              className="ios-btn-secondary w-full py-2.5 px-3 rounded-2xl text-xs font-semibold text-sky-300 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+            >
+              <span>🎨</span>
+              <span>{showCustomizerInEnd ? "Ocultar Personalización" : "Cambiar Nombre, Personaje o Traje"}</span>
+              <span className="text-[10px]">{showCustomizerInEnd ? "▲" : "▼"}</span>
+            </button>
+
+            {/* Expandable Customizer Section */}
+            {showCustomizerInEnd && (
+              <div className="ios-glass-card p-4 rounded-2xl flex flex-col gap-4 w-full text-left animate-in fade-in zoom-in-95 duration-150">
+                {/* 1. Name */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold text-white/70">
+                    Tu Apodo:
+                  </label>
+                  <input
+                    type="text"
+                    value={nickname}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onKeyUp={(e) => e.stopPropagation()}
+                    onKeyPress={(e) => e.stopPropagation()}
+                    placeholder="Escribe tu apodo..."
+                    maxLength={15}
+                    className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/15 focus:border-sky-400 focus:outline-none text-white text-xs font-semibold"
+                  />
+                </div>
+
+                {/* 2. Color Palette */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold text-white/70">
+                    Color de Traje:
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {COLOR_PALETTE.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleSelectColor(c.hex)}
+                        className={`h-7 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
+                          currentColor === c.hex
+                            ? "ring-2 ring-white scale-105 shadow"
+                            : "opacity-75 hover:opacity-100 ring-1 ring-white/20"
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                        title={c.name}
+                      >
+                        {currentColor === c.hex && (
+                          <span className="text-white drop-shadow font-black text-[10px]">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Skin Selector */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-semibold text-white/70">
+                    Personaje:
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {skinsList.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleSelectSkin(s.id)}
+                        className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all cursor-pointer ${
+                          currentSkin === s.id
+                            ? "bg-sky-500/25 border-sky-400/80 text-white ring-1 ring-sky-400/40"
+                            : "bg-white/5 border-white/10 hover:border-white/25 text-white/60 hover:text-white"
+                        }`}
+                      >
+                        <span className="text-xl">{s.icon}</span>
+                        <span className="text-[9px] font-medium mt-0.5">{s.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Host Arena / Floor settings */}
+                {host && (
+                  <div className="flex flex-col gap-3 pt-2 border-t border-white/10">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-semibold text-white/70">
+                        Arena:
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {mapsList.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => handleSelectMap(m.id)}
+                            className={`p-1.5 rounded-xl border text-center transition-all cursor-pointer ${
+                              mapId === m.id
+                                ? "bg-indigo-500/30 border-indigo-400/80 text-white ring-1 ring-indigo-400/40"
+                                : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+                            }`}
+                          >
+                            <span className="text-xs font-semibold">{m.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[11px] font-semibold text-white/70">
+                          Pisos:
+                        </label>
+                        <span className="text-[11px] text-sky-400 font-mono font-bold">
+                          {floorsCount} Pisos
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-6 gap-1">
+                        {floorOptions.map((f) => (
+                          <button
+                            key={f.count}
+                            onClick={() => handleSelectFloorsBtn(f.count)}
+                            className={`py-1 rounded-lg border text-center transition-all cursor-pointer ${
+                              floorsCount === f.count
+                                ? "bg-sky-500/30 border-sky-400/80 text-white scale-105"
+                                : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+                            }`}
+                          >
+                            <span className="text-xs font-bold">{f.count}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="w-full flex flex-col gap-2 pt-1">
               {host && (
                 <button
                   onClick={onStartGame}
-                  className="ios-btn-primary w-full py-3.5 text-white font-bold rounded-2xl uppercase tracking-wider text-xs cursor-pointer"
+                  className="ios-btn-primary w-full py-3.5 text-white font-bold rounded-2xl uppercase tracking-wider text-xs cursor-pointer shadow-lg"
                 >
-                  Jugar Siguiente Ronda 🚀
+                  🚀 Jugar Siguiente Ronda
                 </button>
               )}
-              <button
-                onClick={handleLeaveGame}
-                className="ios-btn-secondary w-full py-3 text-white/80 font-semibold rounded-2xl transition-all cursor-pointer uppercase tracking-wider text-xs"
-              >
-                <span>🚪 Salir de la Sala</span>
-              </button>
+              {host && onReturnToLobby && (
+                <button
+                  onClick={() => {
+                    onReturnToLobby();
+                    playStepSound();
+                  }}
+                  className="ios-btn-secondary w-full py-2.5 text-sky-300 font-semibold rounded-2xl transition-all cursor-pointer uppercase tracking-wider text-xs flex items-center justify-center gap-1.5"
+                >
+                  <span>🏠</span>
+                  <span>Volver a la Sala de Espera</span>
+                </button>
+              )}
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => {
+                    onToggleSettings();
+                    playStepSound();
+                  }}
+                  className="ios-btn-secondary flex-1 py-2.5 text-white/80 font-semibold rounded-2xl transition-all cursor-pointer uppercase tracking-wider text-xs flex items-center justify-center gap-1.5"
+                >
+                  <span>⚙️</span>
+                  <span>Ajustes</span>
+                </button>
+                <button
+                  onClick={handleLeaveGame}
+                  className="flex-1 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-semibold rounded-2xl transition-all cursor-pointer uppercase tracking-wider text-xs flex items-center justify-center gap-1.5"
+                >
+                  <span>🚪</span>
+                  <span>Salir</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

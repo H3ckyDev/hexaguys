@@ -186,6 +186,22 @@ function App() {
     setState("status", "COUNTDOWN");
   };
 
+  // Handle returning to Lobby (Host only)
+  const handleReturnToLobby = () => {
+    if (!isHost()) return;
+
+    players.forEach((p) => {
+      p.setState("isAlive", true);
+      p.setState("isMoving", false);
+      p.setState("isRunning", false);
+    });
+
+    setState("brokenTiles", {});
+    setState("winnerId", null);
+    setState("countdown", 3);
+    setState("status", "LOBBY");
+  };
+
   const handleSelectMap = (newMapId: string) => {
     if (isHost()) {
       setState("mapId", newMapId);
@@ -252,6 +268,7 @@ function App() {
           onSelectMap={handleSelectMap}
           onSelectFloors={handleSelectFloors}
           onStartGame={handleStartGame}
+          onReturnToLobby={handleReturnToLobby}
           showSettings={showSettings}
           onToggleSettings={handleToggleSettings}
           showFps={showFps}
