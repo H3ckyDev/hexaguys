@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { KeyboardControls } from "@react-three/drei";
-import { onPlayerJoin, isHost, setState, getState, RPC, myPlayer } from "playroomkit";
+import { onPlayerJoin, isHost, setState, getState, RPC, myPlayer, getRoomCode } from "playroomkit";
 import { initPlayroom } from "./playroom";
 import { GameScene } from "./components/GameScene";
 import { GameUI } from "./components/GameUI";
@@ -17,10 +17,29 @@ const keyboardMap = [
   { name: "sprint", keys: ["ShiftLeft", "ShiftRight"] },
 ];
 
+function getRoomCodeFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  
+  // 1. Search Query Parameters (?r=abcd, ?room=abcd, ?roomCode=abcd)
+  const searchParams = new URLSearchParams(window.location.search);
+  const searchRoom = searchParams.get("r") || searchParams.get("room") || searchParams.get("roomCode");
+  if (searchRoom && searchRoom.trim()) return searchRoom.trim();
+
+  // 2. Hash Parameters (#r=abcd, #room=abcd)
+  if (window.location.hash) {
+    const hashMatch = window.location.hash.match(/[?&#]r(?:oom)?=([^&]+)/i);
+    if (hashMatch && hashMatch[1]) return hashMatch[1].trim();
+  }
+
+  // 3. Path Parameters (/r/abcd, /room/abcd)
+  const pathMatch = window.location.pathname.match(/\/(?:r|room)\/([^/?#]+)/i);
+  if (pathMatch && pathMatch[1]) return pathMatch[1].trim();
+
+  return null;
+}
+
 function App() {
-  const initialRoom = typeof window !== "undefined"
-    ? (new URLSearchParams(window.location.search).get("r") || new URLSearchParams(window.location.search).get("room"))
-    : null;
+  const initialRoom = getRoomCodeFromUrl();
 
   const [isInGame, setIsInGame] = useState<boolean>(Boolean(initialRoom));
   const [roomCodeToJoin, setRoomCodeToJoin] = useState<string | null>(initialRoom);
@@ -41,12 +60,32 @@ function App() {
   const [showPing, setShowPing] = useState(true);
   const [volume, setVolume] = useState(getGlobalVolume());
 
+  // Listen to browser navigation changes (e.g. back/forward or link paste)
+  useEffect(() => {
+    const handlePopState = () => {
+      const room = getRoomCodeFromUrl();
+      if (room) {
+        setRoomCodeToJoin(room);
+        setIsInGame(true);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   useEffect(() => {
     if (!isInGame) return;
 
     // 1. Initialize Playroom MultiPlayer
     initPlayroom(roomCodeToJoin || undefined).then(() => {
       setConnected(true);
+
+      // Synchronize canonical URL with room code
+      const code = getRoomCode() || roomCodeToJoin;
+      if (code && typeof window !== "undefined") {
+        const canonicalUrl = `${window.location.origin}${window.location.pathname}?r=${code}`;
+        window.history.replaceState({}, "", canonicalUrl);
+      }
 
       // Default room states for host
       if (isHost()) {
