@@ -7,12 +7,14 @@ import { CardboardBoxLobby } from "./CardboardBoxLobby";
 import { PlayerBall } from "./PlayerBall";
 import { myPlayer } from "playroomkit";
 
+import type { GameStatus, MapId } from "../types/game";
+
 interface GameSceneProps {
   players: any[];
   brokenTiles: Record<string, number>;
   onStepTile: (id: string) => void;
-  gameStatus: string;
-  mapId: string;
+  gameStatus: GameStatus;
+  mapId: MapId;
   floorsCount?: number;
   isMobile?: boolean;
 }

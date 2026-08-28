@@ -3,7 +3,8 @@ import { playStepSound } from "../utils/sounds";
 import { PlayIcon, CloseIcon, FlameIcon, TrophyIcon, DiceIcon, SparklesIcon } from "./Icons";
 import { LeaderboardModal } from "./LeaderboardModal";
 import { CyberAvatar } from "./CyberAvatar";
-import { generateRandomAvatar, serializeAvatar, deserializeAvatar, type AvatarConfig } from "../utils/avatarGenerator";
+import { generateRandomAvatar, serializeAvatar, deserializeAvatar } from "../utils/avatarGenerator";
+import type { AvatarConfig } from "../types/game";
 
 interface LandingPageProps {
   onHostGame: () => void;

@@ -1,10 +1,4 @@
-export interface AvatarConfig {
-  head: number;      // 0 - 5: Forma de casco / base
-  eyes: number;      // 0 - 7: Visores y ojos LED
-  mouth: number;     // 0 - 5: Rejillas, ecualizadores y sonrisas
-  accessory: number; // 0 - 5: Antenas, cuernos, auriculares
-  color: string;     // Color base / hex
-}
+import type { AvatarConfig } from "../types/game";
 
 export const HEAD_NAMES = [
   "Cyber Terminal",
@@ -13,7 +7,7 @@ export const HEAD_NAMES = [
   "Mecha Modular",
   "Cyber Ninja",
   "Bot Arcade",
-];
+] as const;
 
 export const EYES_NAMES = [
   "Láser Neón",
@@ -24,7 +18,7 @@ export const EYES_NAMES = [
   "Foco Óptico",
   "Angular Feroz",
   "VR Goggles",
-];
+] as const;
 
 export const MOUTH_NAMES = [
   "Rejilla Vent",
@@ -33,7 +27,7 @@ export const MOUTH_NAMES = [
   "Línea Digital",
   "Filtro Respirador",
   "Núcleo Energía",
-];
+] as const;
 
 export const ACCESSORY_NAMES = [
   "Ninguno",
@@ -42,7 +36,7 @@ export const ACCESSORY_NAMES = [
   "Auriculares Pro",
   "Pernos de Carga",
   "Aletas Aero",
-];
+] as const;
 
 export const TOTAL_HEADS = HEAD_NAMES.length;
 export const TOTAL_EYES = EYES_NAMES.length;
@@ -50,16 +44,22 @@ export const TOTAL_MOUTHS = MOUTH_NAMES.length;
 export const TOTAL_ACCESSORIES = ACCESSORY_NAMES.length;
 
 // Normalizador seguro de color (soporta string hex, objeto { hex: string } y fallbacks)
-export function normalizeColor(input: any, defaultColor = "#0284c7"): string {
+export function normalizeColor(input: unknown, defaultColor = "#0284c7"): string {
   if (!input) return defaultColor;
+  
+  const validateHex = (hex: string) => {
+    const trimmed = hex.trim();
+    const formatted = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+    return /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(formatted) ? formatted : defaultColor;
+  };
+
   if (typeof input === "string") {
-    const trimmed = input.trim();
-    if (trimmed.startsWith("#")) return trimmed;
-    return `#${trimmed}`;
+    return validateHex(input);
   }
   if (typeof input === "object" && input !== null) {
-    if (typeof input.hex === "string") {
-      return normalizeColor(input.hex, defaultColor);
+    const hexObj = input as { hex?: unknown };
+    if (typeof hexObj.hex === "string") {
+      return validateHex(hexObj.hex);
     }
   }
   return defaultColor;
@@ -117,10 +117,10 @@ export function deserializeAvatar(str?: string | null, fallbackColor = "#0284c7"
     const parts = str.split("_");
     if (parts.length >= 6) {
       return {
-        head: Number(parts[1]) || 0,
-        eyes: Number(parts[2]) || 0,
-        mouth: Number(parts[3]) || 0,
-        accessory: Number(parts[4]) || 0,
+        head: Math.max(0, Math.min(TOTAL_HEADS - 1, Number(parts[1]) || 0)),
+        eyes: Math.max(0, Math.min(TOTAL_EYES - 1, Number(parts[2]) || 0)),
+        mouth: Math.max(0, Math.min(TOTAL_MOUTHS - 1, Number(parts[3]) || 0)),
+        accessory: Math.max(0, Math.min(TOTAL_ACCESSORIES - 1, Number(parts[4]) || 0)),
         color: normalizeColor(parts[5], safeColor),
       };
     }

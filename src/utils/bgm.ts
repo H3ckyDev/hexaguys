@@ -4,14 +4,13 @@
  * using the Web Audio API without requiring any external audio files.
  */
 
-import { getGlobalVolume } from "./sounds";
+import { getAudioContext, getMasterBgmGain } from "./audioContext";
+import type { GameStatus } from "../types/game";
 
-let audioCtx: AudioContext | null = null;
-let masterGain: GainNode | null = null;
 let filterNode: BiquadFilterNode | null = null;
 let isPlaying = false;
-let currentMode: "LOBBY" | "PLAYING" | "COUNTDOWN" | "ROUND_OVER" = "LOBBY";
-let timerId: number | null = null;
+let currentMode: GameStatus = "LOBBY";
+let activeTimers: number[] = [];
 let currentStep = 0;
 
 // Escala suave Lo-Fi Pentatonica / Neo-Soul en Eb / C menor (Calida y relajante)
@@ -41,29 +40,15 @@ const MELODY_NOTES = [
 // Bajo calido
 const BASS_NOTES = [77.78, 65.41, 51.91, 58.27];
 
-function getAudioContext(): AudioContext {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  }
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume();
-  }
-  return audioCtx;
-}
-
 function initAudioGraph() {
   const ctx = getAudioContext();
-  if (!masterGain) {
-    masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(getGlobalVolume() * 0.35, ctx.currentTime);
-
+  if (!filterNode) {
     filterNode = ctx.createBiquadFilter();
     filterNode.type = "lowpass";
     filterNode.frequency.setValueAtTime(1100, ctx.currentTime);
     filterNode.Q.setValueAtTime(1.2, ctx.currentTime);
-
-    masterGain.connect(filterNode);
-    filterNode.connect(ctx.destination);
+    
+    filterNode.connect(getMasterBgmGain());
   }
 }
 
@@ -73,8 +58,7 @@ function initAudioGraph() {
 function playWarmPad(freqs: number[], duration: number, isGamePlaying = false) {
   try {
     const ctx = getAudioContext();
-    const mg = masterGain;
-    if (!mg) return;
+    if (!filterNode) return;
     const now = ctx.currentTime;
 
     freqs.forEach((freq, i) => {
@@ -96,13 +80,13 @@ function playWarmPad(freqs: number[], duration: number, isGamePlaying = false) {
       gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
       osc.connect(gain);
-      gain.connect(mg);
+      gain.connect(filterNode!);
 
       osc.start(now);
       osc.stop(now + duration + 0.1);
     });
   } catch (e) {
-    // Ignorar errores de audio contextual
+    console.warn("Audio error in playWarmPad:", e);
   }
 }
 
@@ -112,8 +96,7 @@ function playWarmPad(freqs: number[], duration: number, isGamePlaying = false) {
 function playSubBass(freq: number, duration: number, isGamePlaying = false) {
   try {
     const ctx = getAudioContext();
-    const mg = masterGain;
-    if (!mg) return;
+    if (!filterNode) return;
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -128,12 +111,12 @@ function playSubBass(freq: number, duration: number, isGamePlaying = false) {
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
     osc.connect(gain);
-    gain.connect(mg);
+    gain.connect(filterNode);
 
     osc.start(now);
     osc.stop(now + duration + 0.05);
   } catch (e) {
-    // Ignorar
+    console.warn("Audio error in playSubBass:", e);
   }
 }
 
@@ -143,8 +126,7 @@ function playSubBass(freq: number, duration: number, isGamePlaying = false) {
 function playMelodyPing(freq: number) {
   try {
     const ctx = getAudioContext();
-    const mg = masterGain;
-    if (!mg) return;
+    if (!filterNode) return;
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -158,12 +140,12 @@ function playMelodyPing(freq: number) {
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
 
     osc.connect(gain);
-    gain.connect(mg);
+    gain.connect(filterNode);
 
     osc.start(now);
     osc.stop(now + 0.95);
   } catch (e) {
-    // Ignorar
+    console.warn("Audio error in playMelodyPing:", e);
   }
 }
 
@@ -173,8 +155,7 @@ function playMelodyPing(freq: number) {
 function playSoftPulse() {
   try {
     const ctx = getAudioContext();
-    const mg = masterGain;
-    if (!mg) return;
+    if (!filterNode) return;
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -188,12 +169,12 @@ function playSoftPulse() {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
 
     osc.connect(gain);
-    gain.connect(mg);
+    gain.connect(filterNode);
 
     osc.start(now);
     osc.stop(now + 0.15);
   } catch (e) {
-    // Ignorar
+    console.warn("Audio error in playSoftPulse:", e);
   }
 }
 
@@ -218,9 +199,10 @@ function tick() {
   if (shouldPlayMelody) {
     const randomNote = MELODY_NOTES[Math.floor(Math.random() * MELODY_NOTES.length)];
     // Tocar con ligero delay humano
-    setTimeout(() => {
+    const id = window.setTimeout(() => {
       if (isPlaying) playMelodyPing(randomNote);
     }, Math.random() * 80);
+    activeTimers.push(id);
   }
 
   // Pulso ritmico solo durante la partida
@@ -232,13 +214,22 @@ function tick() {
 
   // Tempo: 850ms por beat (~71 BPM Lo-Fi tempo)
   const interval = isGamePlaying ? 750 : 900;
-  timerId = window.setTimeout(tick, interval);
+  const id = window.setTimeout(tick, interval);
+  activeTimers.push(id);
+}
+
+/**
+ * Limpia los timers
+ */
+function clearTimers() {
+  activeTimers.forEach(id => clearTimeout(id));
+  activeTimers = [];
 }
 
 /**
  * Inicia o reanuda la musica de fondo chill
  */
-export function startBgm(mode: "LOBBY" | "PLAYING" | "COUNTDOWN" | "ROUND_OVER" = "LOBBY") {
+export function startBgm(mode: GameStatus = "LOBBY"): void {
   initAudioGraph();
   currentMode = mode;
 
@@ -249,6 +240,7 @@ export function startBgm(mode: "LOBBY" | "PLAYING" | "COUNTDOWN" | "ROUND_OVER" 
 
   isPlaying = true;
   currentStep = 0;
+  clearTimers();
   updateFilterForMode(mode);
   tick();
 }
@@ -256,18 +248,15 @@ export function startBgm(mode: "LOBBY" | "PLAYING" | "COUNTDOWN" | "ROUND_OVER" 
 /**
  * Detiene la musica de fondo
  */
-export function stopBgm() {
+export function stopBgm(): void {
   isPlaying = false;
-  if (timerId !== null) {
-    clearTimeout(timerId);
-    timerId = null;
-  }
+  clearTimers();
 }
 
 /**
  * Actualiza el modo de juego (Lobby vs Partida) con transicion de filtro
  */
-export function setBgmState(mode: "LOBBY" | "PLAYING" | "COUNTDOWN" | "ROUND_OVER") {
+export function setBgmState(mode: GameStatus): void {
   currentMode = mode;
   updateFilterForMode(mode);
 }
@@ -275,27 +264,22 @@ export function setBgmState(mode: "LOBBY" | "PLAYING" | "COUNTDOWN" | "ROUND_OVE
 /**
  * Ajusta el filtro de corte segun si estamos en Lobby (mas calido y relajado) o en partida
  */
-function updateFilterForMode(mode: "LOBBY" | "PLAYING" | "COUNTDOWN" | "ROUND_OVER") {
-  if (!filterNode || !audioCtx) return;
-  const now = audioCtx.currentTime;
-  if (mode === "PLAYING") {
-    // Mas abierto y con mas presencia
-    filterNode.frequency.setTargetAtTime(1600, now, 0.5);
-  } else if (mode === "COUNTDOWN") {
-    filterNode.frequency.setTargetAtTime(1300, now, 0.3);
-  } else {
-    // Lobby / Round Over: Mas suave y relajado (lo-fi warm)
-    filterNode.frequency.setTargetAtTime(950, now, 0.8);
-  }
-}
-
-/**
- * Actualiza el volumen maestro de la musica de fondo
- */
-export function setBgmVolume(volume: number) {
-  if (masterGain && audioCtx) {
-    const vol = Math.max(0, Math.min(1, volume)) * 0.35;
-    masterGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.1);
+function updateFilterForMode(mode: GameStatus): void {
+  try {
+    if (!filterNode) return;
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    if (mode === "PLAYING") {
+      // Mas abierto y con mas presencia
+      filterNode.frequency.setTargetAtTime(1600, now, 0.5);
+    } else if (mode === "COUNTDOWN") {
+      filterNode.frequency.setTargetAtTime(1300, now, 0.3);
+    } else {
+      // Lobby / Round Over: Mas suave y relajado (lo-fi warm)
+      filterNode.frequency.setTargetAtTime(950, now, 0.8);
+    }
+  } catch (e) {
+    console.warn("Audio error in updateFilterForMode:", e);
   }
 }
 

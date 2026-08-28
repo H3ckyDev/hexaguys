@@ -1,10 +1,33 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permitir lectura y escritura en la colección de clasificaciones
     match /leaderboard_players/{playerId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasAll(['playerId', 'nickname', 'allTimeScore', 'allTimeMatches', 'allTimeWins'])
+        && request.resource.data.playerId is string
+        && request.resource.data.playerId == playerId
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() > 0
+        && request.resource.data.nickname.size() <= 24
+        && request.resource.data.allTimeScore is number
+        && request.resource.data.allTimeScore >= 0
+        && request.resource.data.allTimeMatches is number
+        && request.resource.data.allTimeMatches >= 0
+        && request.resource.data.allTimeWins is number
+        && request.resource.data.allTimeWins >= 0;
+      allow update: if
+        request.resource.data.playerId == playerId
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() > 0
+        && request.resource.data.nickname.size() <= 24
+        && request.resource.data.allTimeScore is number
+        && request.resource.data.allTimeScore >= resource.data.allTimeScore
+        && request.resource.data.allTimeMatches is number
+        && request.resource.data.allTimeMatches >= resource.data.allTimeMatches
+        && request.resource.data.allTimeWins is number
+        && request.resource.data.allTimeWins >= resource.data.allTimeWins;
+      allow delete: if false;
     }
   }
 }
