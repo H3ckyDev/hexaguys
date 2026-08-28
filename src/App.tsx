@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { KeyboardControls } from "@react-three/drei";
 import { onPlayerJoin, isHost, setState, getState, RPC, myPlayer, getRoomCode } from "playroomkit";
+import { Toaster, sileo } from "sileo";
+import "sileo/styles.css";
 import { initPlayroom } from "./playroom";
 import { GameScene } from "./components/GameScene";
 import { GameUI } from "./components/GameUI";
@@ -60,17 +62,18 @@ function App() {
   const [mapId, setMapId] = useState("classic");
   const [floorsCount, setFloorsCount] = useState(3);
 
-  // Estados del menú de ajustes (FPS y Ping activos por defecto, Ping en nombres en false por defecto)
+  // Estados del menú de ajustes (FPS y Volumen)
   const [showSettings, setShowSettings] = useState(false);
-  const [showFps, setShowFps] = useState(true);
-  const [showPing, setShowPing] = useState(true);
-  const [showPlayerPing, setShowPlayerPing] = useState(false);
+  const [showFps, setShowFps] = useState(false);
   const [volume, setVolume] = useState(getGlobalVolume());
   const [afkKickNotice, setAfkKickNotice] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get("kick") === "afk") {
-        return "Has sido desconectado de la sala por inactividad prolongada (60 segundos).";
+      const kickType = urlParams.get("kick");
+      if (kickType === "host") {
+        return "Has sido expulsado de la sala por el anfitrión debido a inactividad (AFK).";
+      } else if (kickType === "afk") {
+        return "Has sido desconectado de la sala por inactividad prolongada.";
       }
     }
     return null;
@@ -187,11 +190,33 @@ function App() {
         }
       });
 
-      // Seguimiento de jugadores que se unen/salen
+      // Registro de RPC para expulsión de jugadores AFK por el anfitrión
+      RPC.register("kickPlayer", async (data: { targetId: string; targetName: string }) => {
+        if (data && data.targetId) {
+          const myId = myPlayer()?.id;
+          if (myId === data.targetId) {
+            // El jugador expulsado es redirigido a la Landing Page
+            window.location.href = `${window.location.origin}${window.location.pathname}?kick=host`;
+          } else {
+            sileo.warning({
+              title: "Jugador expulsado",
+              description: `El anfitrión expulsó a ${data.targetName} por inactividad.`,
+            });
+          }
+        }
+      });
+
+      // Seguimiento de jugadores que se unen/salen con notificaciones Sileo
       onPlayerJoin((player) => {
         if (player.getState("globalScore") === undefined || player.getState("globalScore") === null) {
           player.setState("globalScore", 0);
         }
+
+        const pName = player.getState("name") || player.getProfile()?.name || `Jugador ${player.id.slice(0, 3)}`;
+        sileo.info({
+          title: "Jugador conectado",
+          description: `${pName} se ha unido a la sala.`,
+        });
 
         setPlayers((prev) => {
           if (prev.some((p) => p.id === player.id)) return prev;
@@ -199,13 +224,18 @@ function App() {
         });
 
         player.onQuit(() => {
+          const qName = player.getState("name") || player.getProfile()?.name || `Jugador ${player.id.slice(0, 3)}`;
+          sileo.warning({
+            title: "Jugador desconectado",
+            description: `${qName} ha salido de la sala.`,
+          });
           setPlayers((prev) => prev.filter((p) => p.id !== player.id));
         });
       });
     });
   }, [isInGame]);
 
-  // 2. Poll Room States at 15 FPS (approx every 66ms) to keep React UI reactive and lightweight
+  // 2. Consultar estados de sala cada 66ms para reactividad
   useEffect(() => {
     if (!connected) return;
 
@@ -221,7 +251,8 @@ function App() {
     return () => clearInterval(interval);
   }, [connected]);
 
-  // Play win/loss sound effect on round end
+  // Sonido y notificación Sileo al finalizar ronda
+  const prevWinnerNotified = useRef<string | null>(null);
   useEffect(() => {
     if (!connected) return;
     if (gameStatus === "ROUND_OVER") {
@@ -231,8 +262,20 @@ function App() {
       } else {
         playFallSound();
       }
+
+      if (winnerId && prevWinnerNotified.current !== winnerId) {
+        prevWinnerNotified.current = winnerId;
+        const winnerPlayer = players.find((p) => p.id === winnerId);
+        const winName = winnerPlayer?.getState("name") || winnerPlayer?.getProfile()?.name || "Un jugador";
+        sileo.success({
+          title: "Ronda Finalizada",
+          description: `Victoria de ${winName}`,
+        });
+      }
+    } else if (gameStatus === "PLAYING") {
+      prevWinnerNotified.current = null;
     }
-  }, [gameStatus, winnerId, connected]);
+  }, [gameStatus, winnerId, connected, players]);
 
   // Listener for settings toggling with Escape key
   useEffect(() => {
@@ -360,27 +403,6 @@ function App() {
     setState("status", "COUNTDOWN");
   };
 
-  // Retornar a la sala de espera (Lobby)
-  const handleReturnToLobby = () => {
-    if (isHost()) {
-      players.forEach((p) => {
-        p.setState("isAlive", true);
-        p.setState("isMoving", false);
-        p.setState("isRunning", false);
-      });
-
-      setState("brokenTiles", {});
-      setState("winnerId", null);
-      setState("countdown", 5);
-      setState("status", "LOBBY");
-    }
-
-    // Actualización inmediata del estado local reactivo
-    setGameStatus("LOBBY");
-    setBrokenTiles({});
-    setWinnerId(null);
-  };
-
   const handleSelectMap = (newMapId: string) => {
     if (isHost()) {
       setState("mapId", newMapId);
@@ -409,10 +431,6 @@ function App() {
 
   const handleToggleFps = () => {
     setShowFps((prev) => !prev);
-  };
-
-  const handleTogglePing = () => {
-    setShowPing((prev) => !prev);
   };
 
   const handleSendMessage = (text: string) => {
@@ -483,6 +501,9 @@ function App() {
   return (
     <KeyboardControls map={keyboardMap}>
       <div className="w-full h-full relative overflow-hidden bg-[#0d0e12]">
+        {/* Componente Toaster de Sileo para notificaciones con físicas fluidas */}
+        <Toaster position="top-center" theme="light" />
+
         {/* 1. Escena 3D WebGL Canvas (Capa base de fondo) */}
         <GameScene
           players={players}
@@ -491,12 +512,11 @@ function App() {
           gameStatus={gameStatus}
           mapId={mapId}
           floorsCount={floorsCount}
-          showPlayerPing={showPlayerPing}
           isMobile={isMobile}
         />
 
-        {/* 2. HUD de Rendimiento en una sola línea (FPS y Ping en la esquina inferior derecha) */}
-        <PerformanceHUD showFps={showFps} showPing={showPing} />
+        {/* 2. HUD de Rendimiento (Contador de FPS en la esquina inferior derecha) */}
+        <PerformanceHUD showFps={showFps} />
 
         {/* 3. Chat Multijugador en tiempo real con diseño iOS 26 (Esquina inferior izquierda) */}
         <ChatOverlay
@@ -516,15 +536,10 @@ function App() {
           onSelectMap={handleSelectMap}
           onSelectFloors={handleSelectFloors}
           onStartGame={handleStartGame}
-          onReturnToLobby={handleReturnToLobby}
           showSettings={showSettings}
           onToggleSettings={handleToggleSettings}
           showFps={showFps}
           onToggleFps={handleToggleFps}
-          showPing={showPing}
-          onTogglePing={handleTogglePing}
-          showPlayerPing={showPlayerPing}
-          onTogglePlayerPing={() => setShowPlayerPing((prev) => !prev)}
           volume={volume}
           onVolumeChange={handleVolumeChange}
           isMobile={isMobile}

@@ -1,5 +1,5 @@
 {
-  "name": "hexaguyss",
+  "name": "hexaguys",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,6 +17,7 @@
     "playroomkit": "^0.0.97",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "sileo": "^0.1.5",
     "three": "^0.185.1"
   },
   "devDependencies": {

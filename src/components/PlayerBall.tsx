@@ -4,7 +4,7 @@ import { RigidBody, RapierRigidBody, CapsuleCollider } from "@react-three/rapier
 import { useKeyboardControls, Html } from "@react-three/drei";
 import { CharacterModel } from "./CharacterModel";
 import { playJumpSound, playFallSound, playScoreNotificationSound } from "../utils/sounds";
-import { RPC } from "playroomkit";
+import { sileo } from "sileo";
 import * as THREE from "three";
 
 function shortestAngleDiff(target: number, current: number) {
@@ -21,7 +21,6 @@ interface PlayerBallProps {
   isLocal: boolean;
   gameStatus: string;
   floorsCount?: number;
-  showPlayerPing?: boolean;
   isMobile?: boolean;
 }
 
@@ -32,7 +31,6 @@ export function PlayerBall({
   isLocal,
   gameStatus,
   floorsCount = 3,
-  showPlayerPing = false,
   isMobile = false,
 }: PlayerBallProps) {
   const rbRef = useRef<RapierRigidBody>(null);
@@ -54,8 +52,8 @@ export function PlayerBall({
   const matchSpawnY = topFloorY + 1.8;
   const matchSpawnZ = Math.sin(angle) * spawnDist;
 
-  // Determinar posición según el estado actual
-  const isLobbyMode = gameStatus === "LOBBY";
+  // Determinar posición según el estado actual (Lobby y Fin de Ronda en la Caja de Cartón)
+  const isLobbyMode = gameStatus === "LOBBY" || gameStatus === "ROUND_OVER";
   const spawnX = isLobbyMode ? lobbySpawnX : matchSpawnX;
   const spawnY = isLobbyMode ? lobbySpawnY : matchSpawnY;
   const spawnZ = isLobbyMode ? lobbySpawnZ : matchSpawnZ;
@@ -73,6 +71,7 @@ export function PlayerBall({
   const touchDirection = useRef({ x: 0, z: 0 });
   const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
   const touchJump = useRef(false);
+  const lastActivityRef = useRef(Date.now());
 
   const playerColor = player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8";
   const playerName = player.getState("name") || player.getProfile()?.name || `Player ${player.id.slice(0, 3)}`;
@@ -202,12 +201,13 @@ export function PlayerBall({
   useEffect(() => {
     if (!isLocal) return;
 
-    // Inicialización al montar o al cambiar a LOBBY
-    if (gameStatus === "LOBBY") {
+    // A. Al terminar la ronda (ROUND_OVER) o regresar al Lobby (LOBBY): Teletransportar de inmediato a la Caja de Cartón
+    if (gameStatus === "LOBBY" || gameStatus === "ROUND_OVER") {
       smoothCamTarget.current.set(lobbySpawnX, lobbySpawnY, lobbySpawnZ);
       player.setState("pos", { x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });
       player.setState("isAlive", true);
+      player.setState("deathReason", null);
       player.setState("isMoving", false);
       player.setState("isRunning", false);
 
@@ -218,12 +218,16 @@ export function PlayerBall({
       }
     }
 
-    // Transición a COUNTDOWN / PLAYING (Ir a la Torre Hexagonal)
-    if ((gameStatus === "COUNTDOWN" || gameStatus === "PLAYING") && prevGameStatusRef.current === "LOBBY") {
+    // B. Al iniciar la cuenta regresiva o la partida (COUNTDOWN / PLAYING): Teletransportar a la cima de la Torre Hexagonal
+    if (
+      (gameStatus === "COUNTDOWN" || gameStatus === "PLAYING") &&
+      (prevGameStatusRef.current === "LOBBY" || prevGameStatusRef.current === "ROUND_OVER")
+    ) {
       smoothCamTarget.current.set(matchSpawnX, matchSpawnY, matchSpawnZ);
       player.setState("pos", { x: matchSpawnX, y: matchSpawnY, z: matchSpawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });
       player.setState("isAlive", true);
+      player.setState("deathReason", null);
       player.setState("isMoving", false);
       player.setState("isRunning", false);
 
@@ -237,96 +241,76 @@ export function PlayerBall({
     prevGameStatusRef.current = gameStatus;
   }, [gameStatus, isLocal, player, lobbySpawnX, lobbySpawnY, lobbySpawnZ, matchSpawnX, matchSpawnY, matchSpawnZ]);
 
-  // Detección de inactividad (AFK / Pestaña en segundo plano) y expulsión tras 60s (Se ignora si está chateando)
+  // Detección de inactividad AFK confiable con listeners globales en fase de captura (sin auto-kick)
   useEffect(() => {
     if (!isLocal || !player) return;
 
-    let lastActivity = Date.now();
-    let isCurrentlyAfk = false;
-    let afkStartTime = 0;
-
     const handleActivity = () => {
-      lastActivity = Date.now();
-      afkStartTime = 0;
-      if (isCurrentlyAfk) {
-        isCurrentlyAfk = false;
+      lastActivityRef.current = Date.now();
+      if (player.getState("isAfk")) {
         player.setState("isAfk", false);
       }
     };
 
     const interval = setInterval(() => {
-      // Comprobar si el usuario está chateando o escribiendo en algún campo de texto
+      // Si el usuario está escribiendo o interactuando con inputs, se mantiene activo
       const isTyping = typeof document !== "undefined" && (
         document.activeElement instanceof HTMLInputElement ||
         document.activeElement instanceof HTMLTextAreaElement
       );
 
-      // Si el usuario está chateando o tiene el foco en el chat, se considera activo al 100%
       if (isTyping) {
-        lastActivity = Date.now();
-        afkStartTime = 0;
-        if (isCurrentlyAfk) {
-          isCurrentlyAfk = false;
+        lastActivityRef.current = Date.now();
+        if (player.getState("isAfk")) {
           player.setState("isAfk", false);
         }
         return;
       }
 
       const isHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
-      const isInactive = Date.now() - lastActivity > 20000; // 20 segundos sin interacción para marcar AFK
+      const isInactive = Date.now() - lastActivityRef.current > 20000; // 20s de inactividad
 
       const shouldBeAfk = isHidden || isInactive;
-      if (shouldBeAfk !== isCurrentlyAfk) {
-        isCurrentlyAfk = shouldBeAfk;
-        player.setState("isAfk", shouldBeAfk);
-        if (shouldBeAfk) {
-          afkStartTime = Date.now();
-        } else {
-          afkStartTime = 0;
-        }
-      }
+      const currentAfk = Boolean(player.getState("isAfk"));
 
-      // Expulsión automática al menú tras 60 segundos continuos de inactividad en el Lobby (nunca si está chateando)
-      if (gameStatus === "LOBBY" && shouldBeAfk && !isTyping && afkStartTime > 0 && Date.now() - afkStartTime > 60000) {
-        const pName = player.getState("name") || player.getProfile()?.name || "Jugador";
-        // Difundir notificación de desconexión por inactividad
-        try {
-          RPC.call("chatMessage", {
-            id: `msg_kick_${Date.now()}`,
-            senderId: "system",
-            senderName: "Sistema",
-            senderColor: "#f43f5e",
-            text: `🚪 ${pName} fue desconectado por inactividad prolongada (60s).`,
-            timestamp: Date.now(),
-          }, RPC.Mode.ALL);
-        } catch {
-          // Continuar con la desconexión
-        }
-
-        // Redirigir al menú principal con aviso
-        window.location.href = `${window.location.origin}${window.location.pathname}?kick=afk`;
+      if (shouldBeAfk && !currentAfk) {
+        player.setState("isAfk", true);
+        sileo.warning({
+          title: "Inactividad Detectada",
+          description: "Has entrado en modo AFK por inactividad prolongada.",
+        });
+      } else if (!shouldBeAfk && currentAfk) {
+        player.setState("isAfk", false);
       }
     }, 1000);
 
-    window.addEventListener("mousemove", handleActivity);
-    window.addEventListener("keydown", handleActivity);
-    window.addEventListener("input", handleActivity);
-    window.addEventListener("click", handleActivity);
-    window.addEventListener("touchstart", handleActivity);
-    window.addEventListener("focus", handleActivity);
-    window.addEventListener("visibilitychange", handleActivity);
+    // Listeners globales en fase de captura para interceptar cualquier pulsación o movimiento
+    const captureOptions = { capture: true, passive: true };
+    window.addEventListener("mousemove", handleActivity, captureOptions);
+    window.addEventListener("keydown", handleActivity, captureOptions);
+    window.addEventListener("input", handleActivity, captureOptions);
+    window.addEventListener("pointerdown", handleActivity, captureOptions);
+    window.addEventListener("click", handleActivity, captureOptions);
+    window.addEventListener("touchstart", handleActivity, captureOptions);
+    window.addEventListener("touchmove", handleActivity, captureOptions);
+    window.addEventListener("focus", handleActivity, captureOptions);
+    window.addEventListener("wheel", handleActivity, captureOptions);
+    document.addEventListener("visibilitychange", handleActivity);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener("mousemove", handleActivity);
-      window.removeEventListener("keydown", handleActivity);
-      window.removeEventListener("input", handleActivity);
-      window.removeEventListener("click", handleActivity);
-      window.removeEventListener("touchstart", handleActivity);
-      window.removeEventListener("focus", handleActivity);
-      window.removeEventListener("visibilitychange", handleActivity);
+      window.removeEventListener("mousemove", handleActivity, captureOptions);
+      window.removeEventListener("keydown", handleActivity, captureOptions);
+      window.removeEventListener("input", handleActivity, captureOptions);
+      window.removeEventListener("pointerdown", handleActivity, captureOptions);
+      window.removeEventListener("click", handleActivity, captureOptions);
+      window.removeEventListener("touchstart", handleActivity, captureOptions);
+      window.removeEventListener("touchmove", handleActivity, captureOptions);
+      window.removeEventListener("focus", handleActivity, captureOptions);
+      window.removeEventListener("wheel", handleActivity, captureOptions);
+      document.removeEventListener("visibilitychange", handleActivity);
     };
-  }, [isLocal, player, gameStatus]);
+  }, [isLocal, player]);
 
   const userData = { type: "player", playerId: player.id };
 
@@ -344,8 +328,8 @@ export function PlayerBall({
       const grounded = Math.abs(linvel.y) < 0.35;
       setIsGrounded(grounded);
 
-      // Auto-reaparición de seguridad en LOBBY (Caja de Cartón) o COUNTDOWN (Torre)
-      if (gameStatus === "LOBBY" && translation.y < -5.0) {
+      // Auto-reaparición de seguridad en LOBBY y ROUND_OVER (Caja de Cartón) o COUNTDOWN (Torre)
+      if ((gameStatus === "LOBBY" || gameStatus === "ROUND_OVER") && translation.y < -5.0) {
         rbRef.current.setTranslation({ x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ }, true);
         rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
       } else if (gameStatus === "COUNTDOWN" && translation.y < topFloorY - 1.5) {
@@ -407,7 +391,13 @@ export function PlayerBall({
         setIsMoving(moving);
         setIsRunning(running);
         player.setState("isMoving", moving);
-        player.setState("isRunning", running);
+        // Si el usuario está interactuando o desplazándose, limpiar AFK al instante
+        if (canMove && (moving || keys.jump || touchJump.current || isTyping)) {
+          lastActivityRef.current = Date.now();
+          if (player.getState("isAfk")) {
+            player.setState("isAfk", false);
+          }
+        }
 
         if (moving) {
           const targetAngle = Math.atan2(vx, vz);
@@ -445,39 +435,22 @@ export function PlayerBall({
           player.setState("vel", { x: vx, y: vy, z: vz });
         }
 
-        const scoreEvent = player.getState("scoreNotification") as { timestamp?: number } | undefined;
-        const hasActiveScoreNotification = Boolean(
-          scoreEvent?.timestamp && Date.now() - scoreEvent.timestamp < 2000,
+        // Seguimiento de cámara estabilizada en tercera persona
+        smoothCamTarget.current.lerp(
+          new THREE.Vector3(translation.x, translation.y, translation.z),
+          0.08
         );
 
-        if (gameStatus === "ROUND_OVER" && !scoreNotification && !hasActiveScoreNotification) {
-          rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          rbRef.current.setTranslation({ x: 0, y: -50, z: 0 }, true);
-          smoothCamTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.05);
-          state.camera.position.set(
-            smoothCamTarget.current.x,
-            smoothCamTarget.current.y + 15,
-            smoothCamTarget.current.z + 18
-          );
-          state.camera.lookAt(0, 0, 0);
-        } else {
-          // Seguimiento de cámara estabilizada en tercera persona
-          smoothCamTarget.current.lerp(
-            new THREE.Vector3(translation.x, translation.y, translation.z),
-            0.08
-          );
-
-          state.camera.position.set(
-            smoothCamTarget.current.x,
-            smoothCamTarget.current.y + 6.8,
-            smoothCamTarget.current.z + 8.8
-          );
-          state.camera.lookAt(
-            smoothCamTarget.current.x,
-            smoothCamTarget.current.y + 0.5,
-            smoothCamTarget.current.z
-          );
-        }
+        state.camera.position.set(
+          smoothCamTarget.current.x,
+          smoothCamTarget.current.y + 6.8,
+          smoothCamTarget.current.z + 8.8
+        );
+        state.camera.lookAt(
+          smoothCamTarget.current.x,
+          smoothCamTarget.current.y + 0.5,
+          smoothCamTarget.current.z
+        );
       } else {
         const defaultCamCenter = isLobbyMode
           ? new THREE.Vector3(lobbySpawnX, lobbySpawnY, lobbySpawnZ)
@@ -623,21 +596,15 @@ export function PlayerBall({
                 </div>
               )}
 
-              {/* Insignia de Apodo, AFK, Ping (opcional) y Skin */}
+              {/* Insignia de Apodo, AFK y Skin */}
               <div
                 className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow bg-slate-900/80 border border-slate-700 whitespace-nowrap flex items-center gap-1.5"
                 style={{ borderLeftColor: playerColor, borderLeftWidth: "4px" }}
               >
                 <span>{playerName}</span>
                 {isAfk && (
-                  <span className="text-[9px] text-amber-300 font-extrabold bg-amber-950/90 px-1 py-0.2 rounded border border-amber-400/40 flex items-center gap-0.5 animate-pulse">
-                    💤 AFK
-                  </span>
-                )}
-                {showPlayerPing && (
-                  <span className="text-[9px] text-sky-300 font-mono bg-sky-950/80 px-1 py-0.2 rounded border border-sky-400/30 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
-                    {player.getState("ping") ?? 0}ms
+                  <span className="text-[9px] text-amber-300 font-mono font-bold bg-amber-950/90 px-1 py-0.5 rounded border border-amber-400/40 uppercase">
+                    AFK
                   </span>
                 )}
                 <span className="text-[9px] text-slate-400 capitalize bg-slate-800 px-1 rounded">

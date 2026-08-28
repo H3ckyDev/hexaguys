@@ -164,13 +164,13 @@ interface HexGridProps {
 
 export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
   const [tiles, setTiles] = useState<any[]>([]);
-  const isLobby = gameStatus === "LOBBY";
+  const isLobby = gameStatus === "LOBBY" || gameStatus === "ROUND_OVER";
   const isCountdown = gameStatus === "COUNTDOWN";
   const floorDistance = 4.5;
   const topFloorY = (floorsCount - 1) * floorDistance;
 
   useEffect(() => {
-    // Si estamos en el Lobby (Caja de Cartón), no se renderizan las baldosas de la torre de juego
+    // Si estamos en el Lobby o Fin de Ronda (Caja de Cartón), no se renderizan las baldosas de la torre de juego
     if (isLobby) {
       setTiles([]);
       return;

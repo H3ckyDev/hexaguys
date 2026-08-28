@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { playStepSound } from "../utils/sounds";
+import { PlayIcon, CloseIcon, FlameIcon, DiamondIcon } from "./Icons";
 
 interface LandingPageProps {
   onHostGame: () => void;
@@ -16,121 +17,117 @@ export function LandingPage({ onHostGame, onJoinGame, afkKickNotice, onDismissNo
     e.preventDefault();
     const raw = roomInput.trim();
     if (!raw) {
-      setErrorMessage("Por favor ingresa un código de sala o enlace.");
+      setErrorMessage("Ingresa un código de sala o enlace.");
       return;
     }
 
     playStepSound();
 
-    // Comprobar si el usuario pegó un enlace completo con parámetros
     let code = raw;
     if (raw.includes("?r=")) {
       const match = raw.match(/[?&]r=([^&]+)/);
-      if (match && match[1]) {
-        code = match[1];
-      }
+      if (match && match[1]) code = match[1];
     } else if (raw.includes("?room=")) {
       const match = raw.match(/[?&]room=([^&]+)/);
-      if (match && match[1]) {
-        code = match[1];
-      }
+      if (match && match[1]) code = match[1];
     }
 
     onJoinGame(code);
   };
 
   return (
-    <div className="w-full h-full min-h-screen bg-[#07080b] text-white flex flex-col justify-between items-center p-6 md:p-10 relative overflow-y-auto font-sans select-none">
-      {/* Resplandores ambientales de fondo */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-sky-600/20 via-indigo-600/20 to-pink-600/20 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Encabezado principal */}
-      <header className="w-full max-w-4xl flex justify-between items-center relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-400 via-indigo-500 to-pink-500 flex items-center justify-center font-black text-white shadow-xl text-base ring-1 ring-white/30">
-            HG
+    <div className="w-full h-full min-h-screen bg-[#090d1a] text-slate-100 flex flex-col justify-between items-center p-5 sm:p-8 md:p-10 relative overflow-y-auto font-sans select-none antialiased">
+      {/* Barra de Navegación Superior */}
+      <header className="w-full max-w-5xl flex justify-between items-center relative z-10 pb-4 border-b border-[#1b2548]">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 border border-blue-400/50 flex items-center justify-center font-black text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]">
+            <span className="text-base tracking-tight font-black">HG</span>
           </div>
-          <div>
-            <h1 className="text-lg font-black tracking-tight flex items-center gap-1.5 leading-none">
-              HexaGuys <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-sky-300 font-semibold tracking-wider uppercase">Pro</span>
-            </h1>
-            <span className="text-xs text-white/50 font-medium tracking-tight">
-              Multijugador 3D en Tiempo Real
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-black tracking-tight text-white uppercase font-mono">HEXAGUYS</span>
+              <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-blue-950/80 text-cyan-400 border border-cyan-500/30 font-bold">ARENA 3D</span>
+            </div>
+            <span className="text-sm text-slate-400 font-medium">
+              Plataforma de Supervivencia Multijugador
             </span>
           </div>
         </div>
 
-        <a
-          href="https://github.com/H3ckyDev/hexaguys"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ios-btn-secondary px-3.5 py-2 rounded-2xl text-xs font-semibold text-white/80 flex items-center gap-1.5 transition-all cursor-pointer"
-        >
-          <span>⭐</span>
-          <span>GitHub</span>
-        </a>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#11172f] border border-[#243056]">
+            <DiamondIcon className="w-4 h-4 text-cyan-400" />
+            <span className="text-sm font-mono text-cyan-300 font-bold">TEMPORADA 1</span>
+          </div>
+          <a
+            href="https://github.com/H3ckyDev/hexaguys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 rounded-xl bg-[#131a33] hover:bg-[#1a2345] border border-[#263461] hover:border-blue-500 text-sm font-bold text-slate-300 hover:text-white transition-all shadow-sm"
+          >
+            GitHub
+          </a>
+        </div>
       </header>
 
-      {/* Tarjeta Hero Principal */}
-      <main className="w-full max-w-xl my-auto py-8 relative z-10 flex flex-col items-center gap-6 text-center">
-        {/* Banner de aviso por desconexión de inactividad AFK */}
+      {/* Contenedor Hero Principal */}
+      <main className="w-full max-w-4xl my-auto py-6 relative z-10 flex flex-col gap-6">
+        {/* Banner de Aviso AFK */}
         {afkKickNotice && (
-          <div className="w-full p-4 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center justify-between gap-3 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="w-full p-4 rounded-2xl bg-amber-950/60 border border-amber-500/40 text-amber-200 text-sm font-medium flex items-center justify-between gap-3 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
             <div className="flex items-center gap-2.5">
-              <span className="text-xl">💤</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
               <span className="text-left leading-relaxed">{afkKickNotice}</span>
             </div>
             {onDismissNotice && (
               <button
                 onClick={onDismissNotice}
-                className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+                className="w-7 h-7 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-100 flex items-center justify-center text-sm cursor-pointer shrink-0"
               >
-                ✕
+                <CloseIcon className="w-4 h-4" />
               </button>
             )}
           </div>
         )}
 
-        {/* Insignia de Título */}
-        <div className="flex flex-col items-center gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-sky-400 px-3.5 py-1 rounded-full bg-sky-400/10 border border-sky-400/20 shadow-sm">
-            ✨ Plataforma Hexagonal de Supervivencia
-          </span>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white leading-tight">
-            Sobrevive piso a piso.
-          </h2>
-          <p className="text-sm md:text-base text-white/60 max-w-md">
-            Cada baldosa que pisas empieza a vibrar y colapsa al vacío. ¡Sé el último jugador en pie!
-          </p>
-        </div>
+        {/* Hero Card Principal (Inspirado en el Banner Central de la Imagen) */}
+        <div className="w-full rounded-3xl bg-gradient-to-r from-[#0d2a3a] via-[#102042] to-[#12182e] border border-[#243f6d] p-6 sm:p-8 md:p-10 flex flex-col md:flex-row justify-between items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.6)] relative overflow-hidden">
+          <div className="flex flex-col gap-3.5 text-left max-w-xl z-10">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-mono font-bold uppercase tracking-wider w-fit">
+              <FlameIcon className="w-4 h-4 text-cyan-400" />
+              <span>Plataforma Hexagonal Dinámica</span>
+            </div>
 
-        {/* Action Panel */}
-        <div className="ios-glass-panel p-6 md:p-8 rounded-[36px] w-full flex flex-col gap-5 text-left shadow-2xl">
-          {/* 1. Host New Game Button */}
-          <button
-            onClick={() => {
-              playStepSound();
-              onHostGame();
-            }}
-            className="ios-btn-primary w-full py-4 text-white font-extrabold rounded-2xl text-sm uppercase tracking-wider cursor-pointer shadow-xl flex items-center justify-center gap-2"
-          >
-            <span>🎮</span>
-            <span>Crear Sala Nueva (Host)</span>
-          </button>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white uppercase leading-none">
+              SOBREVIVE PISO A PISO
+            </h2>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-[1px] bg-white/10" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">o únete a una</span>
-            <div className="flex-1 h-[1px] bg-white/10" />
+            <p className="text-base text-slate-300 leading-relaxed max-w-md font-normal">
+              Cada baldosa que pisas colapsa al vacío. Desplaza a tus rivales, calcula tus saltos y sé el último superviviente.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <button
+                onClick={() => {
+                  playStepSound();
+                  onHostGame();
+                }}
+                className="px-7 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-sm font-black uppercase tracking-wider shadow-[0_0_25px_rgba(37,99,235,0.6)] border border-blue-300/40 flex items-center gap-2.5 cursor-pointer transition-all hover:scale-105 active:scale-95"
+              >
+                <PlayIcon className="w-4.5 h-4.5 text-white" />
+                <span>Crear Sala Nueva</span>
+              </button>
+            </div>
           </div>
 
-          {/* 2. Join via Code / Link Form */}
-          <form onSubmit={handleJoinSubmit} className="flex flex-col gap-2.5">
-            <label className="text-xs font-semibold text-white/70 tracking-tight">
-              Código de Sala o Enlace:
-            </label>
-            <div className="flex gap-2">
+          {/* Tarjeta Lateral de Acceso por Código */}
+          <div className="w-full md:w-80 p-5 rounded-2xl bg-[#0f162e]/90 border border-[#243058] flex flex-col gap-4 shadow-xl z-10 text-left">
+            <div className="flex items-center justify-between pb-2 border-b border-[#1f2a50]">
+              <span className="text-xs font-mono uppercase font-black text-slate-300">Unirse a Partida</span>
+              <span className="text-xs font-mono text-cyan-400 font-bold">EN VIVO</span>
+            </div>
+
+            <form onSubmit={handleJoinSubmit} className="flex flex-col gap-3">
               <input
                 type="text"
                 value={roomInput}
@@ -138,42 +135,54 @@ export function LandingPage({ onHostGame, onJoinGame, afkKickNotice, onDismissNo
                   setRoomInput(e.target.value);
                   setErrorMessage("");
                 }}
-                placeholder="Ejemplo: abcd o enlace..."
-                className="flex-1 px-4 py-3 rounded-2xl bg-white/10 border border-white/15 focus:border-sky-400 focus:outline-none text-white text-xs font-semibold placeholder:text-white/30 shadow-inner"
+                placeholder="Código de sala o enlace..."
+                className="w-full px-4 py-3.5 rounded-xl bg-[#0a0f22] border border-[#243058] focus:border-blue-500 focus:outline-none text-white text-sm font-medium placeholder:text-slate-500 transition-colors"
               />
               <button
                 type="submit"
-                className="ios-btn-secondary px-5 py-3 rounded-2xl text-xs font-bold text-white uppercase tracking-wider cursor-pointer shrink-0"
+                className="w-full py-3.5 rounded-xl bg-[#172247] hover:bg-blue-600 border border-[#2a3a6b] hover:border-blue-400 text-sm font-black text-white uppercase tracking-wider transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
               >
-                Unirse
+                <PlayIcon className="w-4 h-4" />
+                <span>Entrar a la Sala</span>
               </button>
-            </div>
-            {errorMessage && (
-              <span className="text-xs text-rose-400 font-semibold">{errorMessage}</span>
-            )}
-          </form>
+              {errorMessage && (
+                <span className="text-sm text-rose-400 font-medium">{errorMessage}</span>
+              )}
+            </form>
+          </div>
         </div>
 
-        {/* Features / Quick Guide Capsule */}
-        <div className="ios-glass-card p-4 rounded-2xl w-full flex flex-col md:flex-row justify-around items-center gap-3 text-xs text-white/70">
+        {/* Barra de Controles y Atajos de Teclado */}
+        <div className="w-full bg-[#0f152b] border border-[#1f2a52] rounded-2xl px-6 py-4 flex flex-wrap justify-around items-center gap-4 text-sm text-slate-300 shadow-lg">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🏃</span>
-            <span><strong>WASD</strong> caminar • <strong>Shift</strong> correr</span>
+            <span className="text-xs font-mono uppercase font-bold text-slate-400">Movimiento</span>
+            <div className="flex gap-1">
+              <kbd>W</kbd>
+              <kbd>A</kbd>
+              <kbd>S</kbd>
+              <kbd>D</kbd>
+            </div>
           </div>
+
+          <div className="h-4 w-[1px] bg-[#1f2a52] hidden sm:block" />
+
           <div className="flex items-center gap-2">
-            <span className="text-lg">🦘</span>
-            <span><strong>Espacio</strong> saltar</span>
+            <span className="text-xs font-mono uppercase font-bold text-slate-400">Salto</span>
+            <kbd>Espacio</kbd>
           </div>
+
+          <div className="h-4 w-[1px] bg-[#1f2a52] hidden sm:block" />
+
           <div className="flex items-center gap-2">
-            <span className="text-lg">📶</span>
-            <span>Latencia <strong>0ms</strong></span>
+            <span className="text-xs font-mono uppercase font-bold text-slate-400">Sprint</span>
+            <kbd>Shift</kbd>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full max-w-4xl text-center text-xs text-white/40 py-2 relative z-10">
-        HexaGuys © {new Date().getFullYear()} • Creado con React Three Fiber, Rapier Physics y PlayroomKit
+      {/* Pie de Página */}
+      <footer className="w-full max-w-5xl text-center text-sm text-slate-500 py-3 border-t border-[#1b2548] font-mono">
+        HexaGuys © {new Date().getFullYear()} • Plataforma 3D Multijugador en Tiempo Real
       </footer>
     </div>
   );

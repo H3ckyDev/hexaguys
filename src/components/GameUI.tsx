@@ -1,6 +1,25 @@
 import { useState, useEffect } from "react";
-import { isHost, myPlayer, getRoomCode } from "playroomkit";
+import { isHost, myPlayer, getRoomCode, RPC } from "playroomkit";
+import { sileo } from "sileo";
 import { playStepSound } from "../utils/sounds";
+import {
+  CopyIcon,
+  UsersIcon,
+  SettingsIcon,
+  PlayIcon,
+  CrownIcon,
+  LogOutIcon,
+  CheckIcon,
+  CloseIcon,
+  GridIcon,
+  UserIcon,
+  CoinIcon,
+  DiamondIcon,
+  RobotSkinIcon,
+  NinjaSkinIcon,
+  AstroSkinIcon,
+  AlienSkinIcon,
+} from "./Icons";
 
 interface GameUIProps {
   players: any[];
@@ -12,31 +31,40 @@ interface GameUIProps {
   onSelectMap: (mapId: string) => void;
   onSelectFloors: (count: number) => void;
   onStartGame: () => void;
-  onReturnToLobby?: () => void;
-  // Propiedades de Ajustes
   showSettings: boolean;
   onToggleSettings: () => void;
   showFps: boolean;
   onToggleFps: () => void;
-  showPing: boolean;
-  onTogglePing: () => void;
-  showPlayerPing?: boolean;
-  onTogglePlayerPing?: () => void;
   volume: number;
   onVolumeChange: (vol: number) => void;
   isMobile?: boolean;
 }
 
 const COLOR_PALETTE = [
-  { id: "sky", hex: "#0a84ff", name: "Azul Pro" },
-  { id: "rose", hex: "#ff375f", name: "Rosa Neón" },
-  { id: "purple", hex: "#bf5af2", name: "Púrpura" },
-  { id: "emerald", hex: "#30d158", name: "Esmeralda" },
-  { id: "amber", hex: "#ffd60a", name: "Ámbar" },
-  { id: "orange", hex: "#ff9f0a", name: "Naranja" },
-  { id: "indigo", hex: "#5e5ce6", name: "Índigo" },
-  { id: "teal", hex: "#64d2ff", name: "Turquesa" },
+  { id: "sky", hex: "#0284c7", name: "Azul" },
+  { id: "emerald", hex: "#059669", name: "Esmeralda" },
+  { id: "indigo", hex: "#4f46e5", name: "Índigo" },
+  { id: "rose", hex: "#e11d48", name: "Rosa" },
+  { id: "amber", hex: "#d97706", name: "Ámbar" },
+  { id: "purple", hex: "#9333ea", name: "Púrpura" },
+  { id: "teal", hex: "#0d9488", name: "Turquesa" },
+  { id: "slate", hex: "#475569", name: "Pizarra" },
 ];
+
+const SKINS_LIST = [
+  { id: "robot", name: "Robot", Icon: RobotSkinIcon },
+  { id: "ninja", name: "Ninja", Icon: NinjaSkinIcon },
+  { id: "astronaut", name: "Astronauta", Icon: AstroSkinIcon },
+  { id: "alien", name: "Alien", Icon: AlienSkinIcon },
+];
+
+const MAPS_LIST = [
+  { id: "classic", name: "CLÁSICO", desc: "Equilibrado", badge: "Estándar" },
+  { id: "tower", name: "LA TORRE", desc: "Supervivencia Vertical", badge: "Vertical" },
+  { id: "hourglass", name: "EMBUDO", desc: "Colapso Rápido", badge: "Caótico" },
+];
+
+const FLOOR_OPTIONS = [2, 3, 4, 5, 6, 7];
 
 export function GameUI({
   players,
@@ -48,15 +76,10 @@ export function GameUI({
   onSelectMap,
   onSelectFloors,
   onStartGame,
-  onReturnToLobby,
   showSettings,
   onToggleSettings,
   showFps,
   onToggleFps,
-  showPing,
-  onTogglePing,
-  showPlayerPing = false,
-  onTogglePlayerPing,
   volume,
   onVolumeChange,
   isMobile = false,
@@ -65,19 +88,22 @@ export function GameUI({
   const activePlayers = players.filter((p) => !p.getState("isAfk"));
   const host = isHost();
   const localPlayer = myPlayer();
-  const [showCustomizerInEnd, setShowCustomizerInEnd] = useState(false);
-  const [showLobbyCustomizer, setShowLobbyCustomizer] = useState(false);
-  
-  const currentSkin = localPlayer?.getState("skin");
+
+  // Estados de navegación
+  const [activeTab, setActiveTab] = useState<"custom" | "match" | "players">("custom");
+  const [showLobbyDrawer, setShowLobbyDrawer] = useState(false);
+  const [showEndCustomizer, setShowEndCustomizer] = useState(false);
+  const [showPlayersMenu, setShowPlayersMenu] = useState(false);
+
+  const currentSkin = localPlayer?.getState("skin") || "robot";
   const currentColor = localPlayer?.getState("color") || localPlayer?.getProfile()?.color?.hex || COLOR_PALETTE[0].hex;
-  
-  // Cargar apodo persistido desde localStorage o generar uno aleatorio
+
+  // Apodo
   const [nickname, setNickname] = useState(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("hexaguys_username") : null;
     return saved || localPlayer?.getState("name") || localPlayer?.getProfile()?.name || `Jugador_${Math.floor(Math.random() * 900 + 100)}`;
   });
 
-  // Sincronizar apodo, color por defecto y skin inicial al montar
   useEffect(() => {
     if (localPlayer) {
       if (!localPlayer.getState("name")) {
@@ -93,20 +119,35 @@ export function GameUI({
     }
   }, [localPlayer, host, nickname, currentColor]);
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const code = getRoomCode() || new URLSearchParams(window.location.search).get("r");
     const inviteUrl = code
       ? `${window.location.origin}${window.location.pathname}?r=${code}`
       : window.location.href;
-    navigator.clipboard.writeText(inviteUrl);
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      playStepSound();
+      sileo.success({
+        title: "Enlace copiado",
+        description: `Código de sala: ${code || "activo"}. Compártelo para invitar.`,
+      });
+    } catch {
+      sileo.error({
+        title: "Error al copiar",
+        description: "Copia la URL manualmente desde la barra de direcciones.",
+      });
+    }
+  };
+
+  const handleKickPlayer = (targetId: string, targetName: string) => {
+    if (!host) return;
     playStepSound();
-    alert(`¡Enlace copiado! (Sala: ${code || "activa"}) - Compártelo con tus amigos para que entren directo.`);
+    RPC.call("kickPlayer", { targetId, targetName }, RPC.Mode.ALL);
   };
 
   const handleNameChange = (val: string) => {
     const clean = val.slice(0, 15);
     setNickname(clean);
-    // Persistir apodo en localStorage
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("hexaguys_username", clean);
@@ -160,17 +201,8 @@ export function GameUI({
 
   const isLocalAlive = localPlayer ? localPlayer.getState("isAlive") !== false : true;
 
-  const floorOptions = [
-    { count: 2, label: "2 Pisos", desc: "Rápida" },
-    { count: 3, label: "3 Pisos", desc: "Estándar" },
-    { count: 4, label: "4 Pisos", desc: "Desafío" },
-    { count: 5, label: "5 Pisos", desc: "Torre" },
-    { count: 6, label: "6 Pisos", desc: "Maratón" },
-    { count: 7, label: "7 Pisos", desc: "Mega" },
-  ];
-
   const getWinnerName = () => {
-    if (!winnerId) return "Nadie (Empate)";
+    if (!winnerId) return "Empate";
     const winner = players.find((p) => p.id === winnerId);
     return winner ? (winner.getState("name") || winner.getProfile()?.name || "Desconocido") : "Desconocido";
   };
@@ -181,142 +213,207 @@ export function GameUI({
     return winner?.getState("color") || winner?.getProfile()?.color?.hex || "#ffffff";
   };
 
-  const skinsList = [
-    { id: "robot", name: "Robot", icon: "🤖" },
-    { id: "ninja", name: "Ninja", icon: "🥷" },
-    { id: "astronaut", name: "Astro", icon: "🧑‍🚀" },
-    { id: "alien", name: "Alien", icon: "👽" },
-  ];
-
-  const mapsList = [
-    { id: "classic", name: "Clásico", desc: "Equilibrado" },
-    { id: "tower", name: "La Torre", desc: "Vertical" },
-    { id: "hourglass", name: "Embudo", desc: "Caótico" },
-  ];
+  const CurrentSkinComponent = SKINS_LIST.find((s) => s.id === currentSkin)?.Icon || RobotSkinIcon;
 
   return (
-    <div className={`absolute inset-0 pointer-events-none flex flex-col justify-between p-2 sm:p-5 md:p-7 z-30 select-none font-sans ${isMobile ? "mobile-game-ui" : ""}`}>
-      {/* TOP DYNAMIC ISLAND BAR */}
-      <div className="flex justify-between items-start pointer-events-auto gap-4">
-        {/* Game Brand & Action Pill */}
-        <div className="ios-glass-panel p-3.5 md:p-4 rounded-[26px] flex flex-col gap-3 text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-sky-400 via-indigo-500 to-pink-500 flex items-center justify-center font-black text-white shadow-lg text-sm ring-1 ring-white/30">
-              HG
+    <div className={`absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-30 select-none font-sans antialiased ${isMobile ? "mobile-game-ui" : ""}`}>
+      {/* 1. BARRA SUPERIOR (Cápsulas a la izquierda, Centro despejado para notificaciones, Perfil a la derecha) */}
+      <header className="flex justify-between items-center pointer-events-auto gap-3 w-full max-w-6xl mx-auto z-50">
+        {/* Lado Izquierdo: Cápsulas de Estado (Sala, Pisos, Puntos) */}
+        <div className="flex items-center gap-2.5 overflow-x-auto py-1">
+          {/* Cápsula Naranja: Código de Sala con botón de copiar */}
+          <button
+            onClick={handleCopyLink}
+            className="px-4 py-2 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-orange-500/80 text-sm font-bold text-orange-400 hover:text-orange-300 flex items-center gap-2 shadow-[0_0_12px_rgba(249,115,22,0.25)] transition-all cursor-pointer active:scale-95"
+            title="Copiar código de invitación"
+          >
+            <CopyIcon className="w-4 h-4 text-orange-400" />
+            <span className="font-mono text-sm text-white font-bold">{getRoomCode() || "SALA"}</span>
+            <span className="text-xs text-orange-400/80 uppercase font-bold tracking-wider">Copiar</span>
+          </button>
+
+          {/* Cápsula Dorada: Puntuación del Jugador */}
+          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#11172f] border border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
+            <CoinIcon className="w-4 h-4 text-amber-400" />
+            <span className="text-sm font-mono text-amber-300 font-black">{localPlayer?.getState("globalScore") || 0}</span>
+            <span className="text-xs text-amber-400/80 font-mono font-bold">PTS</span>
+          </div>
+
+        </div>
+
+        {/* Lado Derecho: Perfil de Usuario y Acciones Rápidas */}
+        <div className="flex items-center gap-2.5">
+          {/* Perfil del Jugador con Avatar y Estado */}
+          <div className="flex items-center gap-3 px-3.5 py-1.5 rounded-2xl bg-[#0f152b] border border-[#243464] shadow-md">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white border border-white/20 relative shadow-sm shrink-0"
+              style={{ backgroundColor: currentColor }}
+            >
+              <CurrentSkinComponent className="w-4.5 h-4.5 text-white" />
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#0f152b]" />
             </div>
-            <div>
-              <h1 className="text-base font-extrabold tracking-tight text-white flex items-center gap-1.5 leading-none">
-                HexaGuys <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-sky-300 font-semibold tracking-wider uppercase">Pro</span>
-              </h1>
-              <span className="text-[11px] text-white/50 font-medium tracking-tight">
-                {host ? "👑 Anfitrión de Sala" : "🎮 Conectado"}
+
+            <div className="flex flex-col text-left">
+              <span className="text-sm font-black tracking-tight text-white leading-tight">
+                {nickname || "Jugador"}
+              </span>
+              <span className="text-[11px] font-mono text-slate-400 font-bold uppercase">
+                {host ? "Anfitrión" : "Jugador"}
               </span>
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={handleCopyLink}
-              className="ios-btn-secondary px-3 py-1.5 rounded-xl text-xs font-semibold text-white/90 flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>🔗</span>
-              <span>Invitar</span>
-            </button>
-            <button
-              onClick={onToggleSettings}
-              className="ios-btn-secondary px-3 py-1.5 rounded-xl text-xs font-semibold text-white/90 flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>⚙️</span>
-              <span>Ajustes</span>
-            </button>
-          </div>
-        </div>
+          {/* Botón de Lista de Jugadores */}
+          <button
+            onClick={() => {
+              playStepSound();
+              setShowPlayersMenu((prev) => !prev);
+            }}
+            className="w-10 h-10 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-[#243464] hover:border-blue-500 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer shadow-md relative active:scale-95"
+            title="Participantes"
+          >
+            <UsersIcon className="w-4.5 h-4.5" />
+            <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-mono text-[10px] font-bold border border-[#090d1a]">
+              {players.length}
+            </span>
+          </button>
 
-        {/* Live Players Widget */}
-        <div className="ios-glass-panel p-3.5 md:p-4 rounded-[26px] text-white min-w-52 max-w-64">
-          <div className="flex justify-between items-center pb-2 mb-2 border-b border-white/10">
-            <h2 className="text-[11px] font-bold tracking-wider uppercase text-white/60">
-              Jugadores ({players.length})
-            </h2>
-          </div>
-          <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
-            {players.map((p) => {
-              const isAlive = p.getState("isAlive") !== false;
-              const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
-              const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0a84ff";
-              const score = p.getState("globalScore") || 0;
-              const skin = p.getState("skin");
-              
-              const hasSelected = skin !== undefined && skin !== null;
-              const skinIcon = hasSelected
-                ? skinsList.find((s) => s.id === skin)?.icon || "🤖"
-                : "❓";
+          {/* Botón de Ajustes */}
+          <button
+            onClick={onToggleSettings}
+            className="w-10 h-10 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-[#243464] hover:border-blue-500 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer shadow-md active:scale-95"
+            title="Ajustes del sistema"
+          >
+            <SettingsIcon className="w-4.5 h-4.5" />
+          </button>
 
-              const isAfk = Boolean(p.getState("isAfk"));
-
-              return (
-                <div key={p.id} className="flex justify-between items-center gap-2">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span
-                      className="w-3 h-3 rounded-full inline-block shrink-0 shadow-sm ring-1 ring-white/30"
-                      style={{ backgroundColor: pColor }}
-                    />
-                    <span
-                      className={`text-xs font-medium truncate ${
-                        !hasSelected
-                          ? "text-white/40 italic animate-pulse"
-                          : isAlive
-                          ? isAfk
-                            ? "text-amber-300"
-                            : "text-white/90"
-                          : "text-white/35 line-through"
-                      }`}
-                    >
-                      {skinIcon} {pName}
-                    </span>
-                    {/* Indicador de inactividad AFK */}
-                    {isAfk && isAlive && (
-                      <span className="text-[10px] text-amber-300 animate-pulse font-bold" title="Ausente / AFK">
-                        💤
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg bg-white/10 text-amber-300 ring-1 ring-white/10">
-                    🏆 {score}
+          {/* Menú Desplegable de Participantes (Estilo Friends / Online Panel de la Referencia) */}
+          {showPlayersMenu && (
+            <div className="absolute right-3 top-16 bg-[#0f152b] border border-[#243464] p-5 rounded-3xl text-slate-100 min-w-80 max-w-96 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-50 animate-in fade-in duration-150">
+              <div className="flex justify-between items-center pb-2.5 mb-3 border-b border-[#1b2548]">
+                <div className="flex items-center gap-2">
+                  <UsersIcon className="w-4.5 h-4.5 text-cyan-400" />
+                  <span className="text-sm font-mono uppercase font-black text-white">
+                    Participantes ({players.length})
                   </span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* MODALES Y CAPAS SUPERPUESTAS */}
-      <div className="flex-1 flex items-center justify-center pointer-events-auto my-4 relative z-40">
-        {/* Modal de Ajustes */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] pointer-events-auto p-4">
-            <div className="ios-glass-panel p-7 md:p-8 rounded-[34px] flex flex-col gap-6 max-w-sm w-full text-white animate-in fade-in zoom-in duration-200">
-              <div className="text-center">
-                <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-white/10 flex items-center justify-center text-2xl ring-1 ring-white/20 shadow-inner">
-                  ⚙️
-                </div>
-                <h3 className="text-xl font-bold tracking-tight text-white">
-                  Ajustes
-                </h3>
-                <p className="text-white/50 text-xs mt-0.5">Control de rendimiento y preferencias</p>
+                <button
+                  onClick={() => setShowPlayersMenu(false)}
+                  className="w-7 h-7 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white text-sm flex items-center justify-center cursor-pointer"
+                >
+                  <CloseIcon className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Volume Slider */}
-              <div className="ios-glass-card p-4 rounded-2xl flex flex-col gap-2.5">
-                <div className="flex justify-between text-xs font-semibold text-white/80">
-                  <span>Efectos de Sonido</span>
-                  <span className="text-sky-400 font-mono font-bold">{Math.round(volume * 100)}%</span>
+              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1 divide-y divide-[#182142]">
+                {players.map((p) => {
+                  const isAlive = p.getState("isAlive") !== false;
+                  const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
+                  const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0284c7";
+                  const score = p.getState("globalScore") || 0;
+                  const skin = p.getState("skin") || "robot";
+                  const SkinComp = SKINS_LIST.find((s) => s.id === skin)?.Icon || RobotSkinIcon;
+                  const isAfk = Boolean(p.getState("isAfk"));
+
+                  return (
+                    <div key={p.id} className="flex justify-between items-center gap-2 pt-2 text-xs">
+                      <div className="flex items-center gap-2.5 truncate">
+                        <div
+                          className="w-7 h-7 rounded-xl flex items-center justify-center text-white border border-white/20 shrink-0 shadow-sm"
+                          style={{ backgroundColor: pColor }}
+                        >
+                          <SkinComp className="w-3.5 h-3.5 text-white" />
+                        </div>
+
+                        <div className="flex flex-col truncate">
+                          <span
+                            className={`truncate font-bold text-xs ${
+                              isAlive
+                                ? isAfk
+                                ? "text-amber-300 font-black"
+                                : "text-white"
+                                : "text-slate-500 line-through"
+                            }`}
+                          >
+                            {pName}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400 font-medium">
+                            {isAfk ? "AUSENTE / AFK" : "ACTIVO"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {host && localPlayer && p.id !== localPlayer.id && isAfk && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleKickPlayer(p.id, pName);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[10px] font-bold cursor-pointer transition-all"
+                          >
+                            Expulsar
+                          </button>
+                        )}
+                        <span className="text-xs font-mono font-bold text-amber-400 bg-[#141b36] px-2 py-1 rounded-lg border border-[#243464]">
+                          {score} PTS
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* 2. OVERLAYS EN PARTIDA Y MODALES */}
+      <div className="flex-1 flex items-center justify-center pointer-events-auto my-auto relative z-40">
+        {/* Countdown Overlay */}
+        {gameStatus === "COUNTDOWN" && (
+          <div className="bg-[#0f152b] border border-cyan-500/60 px-12 py-10 rounded-3xl flex flex-col items-center gap-3 text-white shadow-[0_0_50px_rgba(6,182,212,0.35)] animate-in zoom-in-95 duration-150">
+            <span className="text-sm font-mono font-bold uppercase tracking-widest text-cyan-400">
+              INICIO DE RONDA
+            </span>
+            <div className="text-9xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_25px_rgba(255,255,255,0.7)]">
+              {countdown}
+            </div>
+            <span className="text-sm text-slate-300 font-medium">
+              ¡Mantén el balance y no te detengas!
+            </span>
+          </div>
+        )}
+
+        {/* Modal de Ajustes */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[100] pointer-events-auto p-4 animate-in fade-in duration-150">
+            <div className="bg-[#0f152b] border border-[#243464] p-6 sm:p-7 rounded-3xl flex flex-col gap-5 max-w-sm w-full text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
+              <div className="flex justify-between items-center border-b border-[#1f2a50] pb-3">
+                <div className="flex items-center gap-2">
+                  <SettingsIcon className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-sm font-black tracking-tight text-white uppercase font-mono">
+                    Ajustes del Sistema
+                  </h3>
+                </div>
+                <button
+                  onClick={onToggleSettings}
+                  className="w-6 h-6 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white text-xs flex items-center justify-center cursor-pointer"
+                >
+                  <CloseIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Slider de Volumen */}
+              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col gap-2">
+                <div className="flex justify-between text-xs font-bold text-slate-200 font-mono">
+                  <span>EFECTOS DE SONIDO</span>
+                  <span className="text-cyan-400">{Math.round(volume * 100)}%</span>
                 </div>
                 <div className="flex items-center gap-3 mt-1">
                   <button
                     onClick={() => handleVolumeBtn(-0.1)}
-                    className="ios-btn-secondary w-8 h-8 rounded-xl font-bold flex items-center justify-center text-xs text-white"
+                    className="w-8 h-8 rounded-xl bg-[#141c38] hover:bg-[#1b264d] text-xs font-bold text-white flex items-center justify-center cursor-pointer transition-colors"
                   >
                     -
                   </button>
@@ -330,388 +427,106 @@ export function GameUI({
                       onVolumeChange(parseFloat(e.target.value));
                       if (Math.random() < 0.25) playStepSound();
                     }}
-                    className="flex-1 accent-sky-400 cursor-pointer h-1.5 bg-white/20 rounded-lg appearance-none"
+                    className="flex-1 accent-cyan-400 cursor-pointer h-2 bg-[#141c38] rounded-lg appearance-none"
                   />
                   <button
                     onClick={() => handleVolumeBtn(0.1)}
-                    className="ios-btn-secondary w-8 h-8 rounded-xl font-bold flex items-center justify-center text-xs text-white"
+                    className="w-8 h-8 rounded-xl bg-[#141c38] hover:bg-[#1b264d] text-xs font-bold text-white flex items-center justify-center cursor-pointer transition-colors"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              {/* FPS Counter Toggle (iOS Switch) */}
-              <div className="ios-glass-card p-4 rounded-2xl flex justify-between items-center">
+              {/* Toggle de FPS */}
+              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex justify-between items-center">
                 <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-white/90">Contador de FPS</span>
-                  <span className="text-[10px] text-white/45">Supervisar fluidez de fotogramas</span>
+                  <span className="text-xs font-bold text-slate-200 font-mono">CONTADOR DE FPS</span>
+                  <span className="text-[10px] text-slate-500">Muestra la fluidez en pantalla</span>
                 </div>
                 <button
                   onClick={() => {
                     onToggleFps();
                     playStepSound();
                   }}
-                  className={`w-12 h-7 rounded-full p-0.5 transition-colors duration-200 ease-in-out cursor-pointer relative ${
-                    showFps ? "ios-toggle-on" : "bg-white/20"
+                  className={`w-12 h-6 rounded-full p-0.5 transition-colors duration-150 cursor-pointer relative ${
+                    showFps ? "bg-cyan-500" : "bg-[#141c38]"
                   }`}
                 >
                   <span
-                    className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out block ${
-                      showFps ? "translate-x-5" : "translate-x-0"
+                    className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-150 block ${
+                      showFps ? "translate-x-6" : "translate-x-0"
                     }`}
                   />
                 </button>
               </div>
 
-              {/* Medidor de Ping / Latencia (Interruptor iOS) */}
-              <div className="ios-glass-card p-4 rounded-2xl flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-white/90">Medidor de Ping</span>
-                  <span className="text-[10px] text-white/45">Supervisar latencia de red</span>
-                </div>
-                <button
-                  onClick={() => {
-                    onTogglePing();
-                    playStepSound();
-                  }}
-                  className={`w-12 h-7 rounded-full p-0.5 transition-colors duration-200 ease-in-out cursor-pointer relative ${
-                    showPing ? "ios-toggle-on" : "bg-white/20"
-                  }`}
-                >
-                  <span
-                    className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out block ${
-                      showPing ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Mostrar Ping en Nombres de Jugadores (Interruptor iOS) */}
-              <div className="ios-glass-card p-4 rounded-2xl flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-xs font-semibold text-white/90">Ping en Nombres</span>
-                  <span className="text-[10px] text-white/45">Ver latencia en la etiqueta 3D de cada jugador</span>
-                </div>
-                <button
-                  onClick={() => {
-                    if (onTogglePlayerPing) onTogglePlayerPing();
-                    playStepSound();
-                  }}
-                  className={`w-12 h-7 rounded-full p-0.5 transition-colors duration-200 ease-in-out cursor-pointer relative ${
-                    showPlayerPing ? "ios-toggle-on" : "bg-white/20"
-                  }`}
-                >
-                  <span
-                    className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out block ${
-                      showPlayerPing ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Botones de Acción */}
-              <div className="flex flex-col gap-2.5 pt-1">
+              {/* Acciones */}
+              <div className="flex flex-col gap-2 pt-1">
                 <button
                   onClick={() => {
                     onToggleSettings();
                     playStepSound();
                   }}
-                  className="ios-btn-primary w-full py-3.5 text-white font-bold rounded-2xl cursor-pointer text-xs uppercase tracking-wider"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] cursor-pointer"
                 >
-                  Continuar
+                  Guardar y Cerrar
                 </button>
                 <button
                   onClick={handleLeaveGame}
-                  className="w-full py-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-semibold rounded-2xl transition-all cursor-pointer text-xs active:scale-97 flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <span>🚪</span>
-                  <span>Salir de la Sala</span>
+                  <LogOutIcon className="w-3.5 h-3.5" />
+                  <span>Salir al Menú Principal</span>
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Countdown Overlay (5-Second Countdown) */}
-        {gameStatus === "COUNTDOWN" && (
-          <div className="ios-glass-panel px-8 py-6 rounded-[36px] flex flex-col items-center gap-2 text-white shadow-2xl animate-in zoom-in-95 duration-200 border-amber-400/40">
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-300 animate-pulse">
-              ⚡ ¡Prepárense! La partida inicia en
-            </span>
-            <div className="text-7xl md:text-8xl font-black text-amber-400 font-mono tracking-tight drop-shadow-[0_0_20px_rgba(251,191,36,0.6)]">
-              {countdown}
-            </div>
-            <span className="text-[11px] text-white/70 font-medium">
-              ¡Manténganse en movimiento!
-            </span>
-          </div>
-        )}
-
-        {/* Interfaz flotante del Lobby interactivo - Fija en el centro inferior */}
-        {gameStatus === "LOBBY" && !showSettings && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-40 pointer-events-none w-full max-w-xl px-4 animate-in slide-in-from-bottom duration-300">
-            {/* Floating Customizer Glass Panel (Opens upwards on demand) */}
-            {showLobbyCustomizer && (
-              <div className="ios-glass-panel p-5 md:p-6 rounded-[32px] flex flex-col gap-4 max-w-lg w-full text-white pointer-events-auto shadow-2xl animate-in zoom-in-95 duration-200 mb-2 border border-white/20">
-                <div className="flex justify-between items-center pb-1 border-b border-white/10">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>🎨</span> Personalización de Personaje
-                  </h3>
-                  <button
-                    onClick={() => setShowLobbyCustomizer(false)}
-                    className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-white/60 text-xs flex items-center justify-center cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {/* Left Column: Name & Color */}
-                  <div className="ios-glass-card p-3.5 rounded-2xl flex flex-col gap-3">
-                    {/* 1. NICKNAME INPUT */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-semibold text-white/70">Tu Apodo:</label>
-                      <input
-                        type="text"
-                        value={nickname}
-                        onChange={(e) => handleNameChange(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onKeyUp={(e) => e.stopPropagation()}
-                        onKeyPress={(e) => e.stopPropagation()}
-                        placeholder="Escribe tu apodo..."
-                        maxLength={15}
-                        className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/15 focus:border-sky-400 focus:outline-none text-white text-xs font-semibold shadow-inner"
-                      />
-                    </div>
-
-                    {/* 2. COLOR PALETTE */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-semibold text-white/70">Color de Traje:</label>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {COLOR_PALETTE.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => handleSelectColor(c.hex)}
-                            className={`h-7 rounded-lg transition-all cursor-pointer flex items-center justify-center active:scale-95 shadow-sm ${
-                              currentColor === c.hex
-                                ? "ring-2 ring-white scale-105 shadow-md"
-                                : "opacity-75 hover:opacity-100 ring-1 ring-white/20"
-                            }`}
-                            style={{ backgroundColor: c.hex }}
-                            title={c.name}
-                          >
-                            {currentColor === c.hex && (
-                              <span className="text-white drop-shadow font-black text-[10px]">✓</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Skin & Arena */}
-                  <div className="ios-glass-card p-3.5 rounded-2xl flex flex-col gap-3">
-                    {/* 3. SKIN SELECTOR */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-semibold text-white/70">Personaje:</label>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {skinsList.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() => handleSelectSkin(s.id)}
-                            className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all cursor-pointer active:scale-95 ${
-                              currentSkin === s.id
-                                ? "bg-sky-500/25 border-sky-400/80 text-white shadow ring-1 ring-sky-400/40"
-                                : "bg-white/5 border-white/10 hover:border-white/25 text-white/60 hover:text-white"
-                            }`}
-                          >
-                            <span className="text-xl">{s.icon}</span>
-                            <span className="text-[9px] font-medium mt-0.5">{s.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 4. HOST ARENA / FLOOR SETTINGS */}
-                    {host && (
-                      <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-[11px] font-semibold text-white/70">Arena:</label>
-                          <div className="grid grid-cols-3 gap-1">
-                            {mapsList.map((m) => (
-                              <button
-                                key={m.id}
-                                onClick={() => handleSelectMap(m.id)}
-                                className={`py-1 px-1.5 rounded-lg border text-center transition-all cursor-pointer ${
-                                  mapId === m.id
-                                    ? "bg-indigo-500/30 border-indigo-400/80 text-white ring-1 ring-indigo-400/40"
-                                    : "bg-white/5 border-white/10 text-white/60 hover:text-white"
-                                }`}
-                              >
-                                <span className="text-[11px] font-semibold">{m.name}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                          <div className="flex justify-between items-center">
-                            <label className="text-[11px] font-semibold text-white/70">Pisos:</label>
-                            <span className="text-[11px] text-sky-400 font-mono font-bold">{floorsCount} Pisos</span>
-                          </div>
-                          <div className="grid grid-cols-6 gap-1">
-                            {floorOptions.map((f) => (
-                              <button
-                                key={f.count}
-                                onClick={() => handleSelectFloorsBtn(f.count)}
-                                className={`py-1 rounded-lg border text-center transition-all cursor-pointer ${
-                                  floorsCount === f.count
-                                    ? "bg-sky-500/30 border-sky-400/80 text-white"
-                                    : "bg-white/5 border-white/10 text-white/60 hover:text-white"
-                                }`}
-                              >
-                                <span className="text-xs font-bold">{f.count}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Dock: Room Badge + Customize + Play Button */}
-            <div className="flex flex-wrap items-center justify-center gap-2.5 pointer-events-auto">
-              <div className="ios-glass-panel px-4 py-2 rounded-full flex items-center gap-2.5 shadow-2xl">
-                <span className="text-[11px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
-                  Lobby {getRoomCode() ? `• Sala: ${getRoomCode()}` : ""}
-                </span>
-
-                <span className="w-[1px] h-3 bg-white/20" />
-
-                <button
-                  onClick={() => {
-                    playStepSound();
-                    setShowLobbyCustomizer((prev) => !prev);
-                  }}
-                  className="ios-btn-secondary px-3 py-1 rounded-full text-xs font-semibold text-white/90 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 hover:bg-white/15"
-                >
-                  <span>🎨</span>
-                  <span>{showLobbyCustomizer ? "Cerrar" : "Personalizar"}</span>
-                </button>
-              </div>
-
-              {host ? (
-                activePlayers.length >= 2 ? (
-                  <button
-                    onClick={() => {
-                      if (document.activeElement instanceof HTMLElement) {
-                        document.activeElement.blur();
-                      }
-                      onStartGame();
-                    }}
-                    className="ios-btn-primary px-6 py-2.5 rounded-full text-xs uppercase font-extrabold tracking-wider text-white shadow-2xl flex items-center gap-2 cursor-pointer active:scale-95 hover:scale-102 transition-all ring-2 ring-sky-400/40"
-                  >
-                    <span className="text-sm">🚀</span>
-                    <span>Comenzar Partida</span>
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    className="px-5 py-2.5 rounded-full text-xs font-bold text-white/50 bg-white/10 border border-white/15 shadow-lg flex items-center gap-2 cursor-not-allowed"
-                    title="Se requieren al menos 2 jugadores activos para comenzar la partida"
-                  >
-                    <span>👥</span>
-                    <span>Mínimo 2 Activos ({activePlayers.length}/2)</span>
-                  </button>
-                )
-              ) : (
-                <div className="ios-pill px-5 py-2 rounded-full text-amber-300 text-xs font-semibold flex items-center gap-2 shadow-xl animate-pulse">
-                  <span>⏳</span>
-                  <span>Esperando al anfitrión...</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Eliminated Spectator Overlay */}
-        {gameStatus === "PLAYING" && !isLocalAlive && !showSettings && (
-          <div className="ios-glass-panel p-6 md:p-8 rounded-[34px] flex flex-col items-center gap-4 max-w-sm text-center animate-in zoom-in-95 duration-200 text-white pointer-events-auto border-rose-500/30">
-            <div className="text-4xl animate-bounce">💀</div>
-            <div className="flex flex-col">
-              <h3 className="text-lg font-bold text-rose-400 tracking-tight">
-                ¡Has caído al vacío!
-              </h3>
-              <p className="text-white/50 text-xs mt-1">
-                Modo espectador ({alivePlayers.length} {alivePlayers.length === 1 ? "jugador restante" : "jugadores restantes"})
-              </p>
-            </div>
-
-            <div className="w-full flex flex-col gap-2 mt-2">
-              <button
-                onClick={handleLeaveGame}
-                className="w-full py-3.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 font-semibold rounded-2xl transition-all cursor-pointer text-xs active:scale-97 flex items-center justify-center gap-2 uppercase tracking-wider"
-              >
-                <span>🚪</span>
-                <span>Salir de la Partida</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Round Over Overlay */}
+        {/* Pantalla de Fin de Ronda (Estilo Podio de Recompensas de la Referencia) */}
         {gameStatus === "ROUND_OVER" && !showSettings && (
-          <div className="ios-glass-panel p-6 md:p-8 rounded-[36px] flex flex-col items-center gap-4 max-w-md w-full text-center animate-in zoom-in-95 duration-200 text-white max-h-[85vh] overflow-y-auto">
-            <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-2xl shadow-lg">
-              👑
+          <div className="bg-[#0f152b] border border-amber-500/40 p-6 sm:p-8 rounded-3xl flex flex-col items-center gap-4 max-w-sm w-full text-center animate-in zoom-in-95 duration-150 text-slate-100 shadow-[0_0_50px_rgba(245,158,11,0.2)]">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+              <CrownIcon className="w-7 h-7" />
             </div>
+
             <div>
-              <h3 className="text-xl font-black tracking-tight text-white">
-                ¡Ronda Finalizada!
+              <h3 className="text-xl font-black tracking-tight text-white uppercase font-mono">
+                Ronda Finalizada
               </h3>
-              <p className="text-white/50 text-xs mt-0.5">Resultados de la partida</p>
+              <p className="text-xs text-slate-400 mt-0.5">Resultados de la partida</p>
             </div>
-            
-            {/* Winner Card */}
-            <div className="ios-glass-card p-3.5 rounded-2xl flex flex-col items-center gap-1.5 w-full">
-              <span className="text-white/50 text-[10px] font-bold uppercase tracking-wider">
-                Ganador de la Ronda
+
+            {/* Ganador */}
+            <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col items-center gap-1.5 w-full shadow-inner">
+              <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest">
+                GANADOR DE LA RONDA (+20 PTS)
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 mt-0.5">
                 <span
-                  className="w-3.5 h-3.5 rounded-full ring-2 ring-white/30 shadow"
+                  className="w-4 h-4 rounded-full border border-white/40 shadow-sm"
                   style={{ backgroundColor: getWinnerColor() }}
                 />
-                <span className="text-base font-bold text-white">{getWinnerName()}</span>
+                <span className="text-lg font-black text-white">{getWinnerName()}</span>
               </div>
             </div>
 
-            {/* Inline Customizer Toggle */}
+            {/* Selector Desplegable de Personalización en Fin de Ronda */}
             <button
               onClick={() => {
-                setShowCustomizerInEnd((prev) => !prev);
+                setShowEndCustomizer((prev) => !prev);
                 playStepSound();
               }}
-              className="ios-btn-secondary w-full py-2.5 px-3 rounded-2xl text-xs font-semibold text-sky-300 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              className="w-full py-2.5 px-3 rounded-xl bg-[#141b36] hover:bg-[#1c264d] border border-[#263461] text-xs font-bold text-cyan-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
-              <span>🎨</span>
-              <span>{showCustomizerInEnd ? "Ocultar Personalización" : "Cambiar Nombre, Personaje o Traje"}</span>
-              <span className="text-[10px]">{showCustomizerInEnd ? "▲" : "▼"}</span>
+              <span>{showEndCustomizer ? "Ocultar Aspecto" : "Cambiar Skin o Color"}</span>
             </button>
 
-            {/* Expandable Customizer Section */}
-            {showCustomizerInEnd && (
-              <div className="ios-glass-card p-4 rounded-2xl flex flex-col gap-4 w-full text-left animate-in fade-in zoom-in-95 duration-150">
-                {/* 1. Name */}
+            {showEndCustomizer && (
+              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col gap-3.5 w-full text-left animate-in fade-in duration-150">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-semibold text-white/70">
-                    Tu Apodo:
-                  </label>
+                  <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Apodo:</label>
                   <input
                     type="text"
                     value={nickname}
@@ -719,185 +534,416 @@ export function GameUI({
                     onKeyDown={(e) => e.stopPropagation()}
                     onKeyUp={(e) => e.stopPropagation()}
                     onKeyPress={(e) => e.stopPropagation()}
-                    placeholder="Escribe tu apodo..."
                     maxLength={15}
-                    className="w-full px-3 py-2 rounded-xl bg-white/10 border border-white/15 focus:border-sky-400 focus:outline-none text-white text-xs font-semibold"
+                    className="w-full px-3 py-2 rounded-xl bg-[#0f152b] border border-[#243058] focus:border-cyan-400 focus:outline-none text-white text-xs font-semibold"
                   />
                 </div>
 
-                {/* 2. Color Palette */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-semibold text-white/70">
-                    Color de Traje:
-                  </label>
+                  <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Skin:</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {SKINS_LIST.map((s) => {
+                      const Icon = s.Icon;
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => handleSelectSkin(s.id)}
+                          className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
+                            currentSkin === s.id
+                              ? "bg-blue-600/30 border-blue-400 text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]"
+                              : "bg-[#0f152b] border-[#243058] text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-[9px] font-bold mt-1">{s.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Color:</label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {COLOR_PALETTE.map((c) => (
                       <button
                         key={c.id}
                         onClick={() => handleSelectColor(c.hex)}
-                        className={`h-7 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
+                        className={`h-6 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
                           currentColor === c.hex
-                            ? "ring-2 ring-white scale-105 shadow"
-                            : "opacity-75 hover:opacity-100 ring-1 ring-white/20"
+                            ? "border-2 border-white scale-105 shadow-md"
+                            : "border border-white/20 opacity-70 hover:opacity-100"
                         }`}
                         style={{ backgroundColor: c.hex }}
                         title={c.name}
                       >
                         {currentColor === c.hex && (
-                          <span className="text-white drop-shadow font-black text-[10px]">✓</span>
+                          <CheckIcon className="w-3 h-3 text-white" />
                         )}
                       </button>
                     ))}
                   </div>
                 </div>
-
-                {/* 3. Skin Selector */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-semibold text-white/70">
-                    Personaje:
-                  </label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {skinsList.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => handleSelectSkin(s.id)}
-                        className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all cursor-pointer ${
-                          currentSkin === s.id
-                            ? "bg-sky-500/25 border-sky-400/80 text-white ring-1 ring-sky-400/40"
-                            : "bg-white/5 border-white/10 hover:border-white/25 text-white/60 hover:text-white"
-                        }`}
-                      >
-                        <span className="text-xl">{s.icon}</span>
-                        <span className="text-[9px] font-medium mt-0.5">{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4. Host Arena / Floor settings */}
-                {host && (
-                  <div className="flex flex-col gap-3 pt-2 border-t border-white/10">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-semibold text-white/70">
-                        Arena:
-                      </label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {mapsList.map((m) => (
-                          <button
-                            key={m.id}
-                            onClick={() => handleSelectMap(m.id)}
-                            className={`p-1.5 rounded-xl border text-center transition-all cursor-pointer ${
-                              mapId === m.id
-                                ? "bg-indigo-500/30 border-indigo-400/80 text-white ring-1 ring-indigo-400/40"
-                                : "bg-white/5 border-white/10 text-white/60 hover:text-white"
-                            }`}
-                          >
-                            <span className="text-xs font-semibold">{m.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[11px] font-semibold text-white/70">
-                          Pisos:
-                        </label>
-                        <span className="text-[11px] text-sky-400 font-mono font-bold">
-                          {floorsCount} Pisos
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-6 gap-1">
-                        {floorOptions.map((f) => (
-                          <button
-                            key={f.count}
-                            onClick={() => handleSelectFloorsBtn(f.count)}
-                            className={`py-1 rounded-lg border text-center transition-all cursor-pointer ${
-                              floorsCount === f.count
-                                ? "bg-sky-500/30 border-sky-400/80 text-white scale-105"
-                                : "bg-white/5 border-white/10 text-white/60 hover:text-white"
-                            }`}
-                          >
-                            <span className="text-xs font-bold">{f.count}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Action Buttons */}
+            {/* Acciones */}
             <div className="w-full flex flex-col gap-2 pt-1">
               {host && (
                 activePlayers.length >= 2 ? (
                   <button
                     onClick={onStartGame}
-                    className="ios-btn-primary w-full py-3.5 text-white font-bold rounded-2xl uppercase tracking-wider text-xs cursor-pointer shadow-lg"
+                    className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(37,99,235,0.6)] flex items-center justify-center gap-2 cursor-pointer transition-all"
                   >
-                    🚀 Jugar Siguiente Ronda
+                    <PlayIcon className="w-4 h-4" />
+                    <span>Jugar Siguiente Ronda</span>
                   </button>
                 ) : (
                   <button
                     disabled
-                    className="w-full py-3.5 rounded-2xl text-xs font-bold text-white/40 bg-white/10 border border-white/10 flex items-center justify-center gap-2 cursor-not-allowed"
+                    className="w-full py-3 rounded-2xl text-xs font-bold text-slate-500 bg-[#0a0f22] border border-[#243058] flex items-center justify-center gap-1.5 cursor-not-allowed"
                   >
-                    <span>👥</span>
-                    <span>Mínimo 2 Jugadores Activos ({activePlayers.length}/2)</span>
+                    Mínimo 2 Jugadores ({activePlayers.length}/2)
                   </button>
                 )
               )}
-              {host && onReturnToLobby && (
-                <button
-                  onClick={() => {
-                    onReturnToLobby();
-                    playStepSound();
-                  }}
-                  className="ios-btn-secondary w-full py-2.5 text-sky-300 font-semibold rounded-2xl transition-all cursor-pointer uppercase tracking-wider text-xs flex items-center justify-center gap-1.5"
-                >
-                  <span>🏠</span>
-                  <span>Volver a la Sala de Espera</span>
-                </button>
-              )}
+
               <div className="flex gap-2 w-full">
                 <button
-                  onClick={() => {
-                    onToggleSettings();
-                    playStepSound();
-                  }}
-                  className="ios-btn-secondary flex-1 py-2.5 text-white/80 font-semibold rounded-2xl transition-all cursor-pointer uppercase tracking-wider text-xs flex items-center justify-center gap-1.5"
-                >
-                  <span>⚙️</span>
-                  <span>Ajustes</span>
-                </button>
-                <button
                   onClick={handleLeaveGame}
-                  className="flex-1 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-semibold rounded-2xl transition-all cursor-pointer uppercase tracking-wider text-xs flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold transition-colors cursor-pointer"
                 >
-                  <span>🚪</span>
-                  <span>Salir</span>
+                  Salir
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        {/* Modo Espectador */}
+        {gameStatus === "PLAYING" && !isLocalAlive && !showSettings && (
+          <div className="bg-[#0f152b] border border-rose-500/40 p-6 rounded-3xl flex flex-col items-center gap-3 max-w-xs text-center animate-in zoom-in-95 duration-150 text-slate-100 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
+            <div className="flex flex-col">
+              <span className="text-xs font-black text-rose-400 uppercase tracking-widest font-mono">
+                ELIMINADO
+              </span>
+              <span className="text-slate-400 text-xs mt-0.5">
+                Modo espectador ({alivePlayers.length} en juego)
+              </span>
+            </div>
+
+            <button
+              onClick={handleLeaveGame}
+              className="w-full py-2.5 bg-[#141b36] hover:bg-rose-600/30 border border-rose-500/30 text-rose-200 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <LogOutIcon className="w-3.5 h-3.5" />
+              <span>Salir de la Partida</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* DOCK INFERIOR */}
-      <div className="flex justify-between items-end pointer-events-none">
-        <div className="flex items-center gap-2.5">
-          {gameStatus === "PLAYING" && (
-            <div className="ios-pill px-3.5 py-2 rounded-full text-white text-xs flex items-center gap-2 font-mono shadow-lg">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] inline-block animate-pulse" />
-              <span className="text-white/60 text-[11px] font-sans">Vivos:</span>
-              <span className="text-emerald-400 font-bold">{alivePlayers.length}</span>
-              <span className="text-white/30">/</span>
-              <span>{players.length}</span>
+      {/* 3. LOBBY HUB INFERIOR (Estilo Game Tiles de la Referencia: ROULETTE / CRASH / TOWERS) */}
+      {gameStatus === "LOBBY" && !showSettings && (
+        <footer className="w-full max-w-5xl mx-auto flex flex-col items-center gap-3 z-40 pointer-events-auto">
+          {/* Panel Desplegable de Configuración y Personalización */}
+          {showLobbyDrawer && (
+            <div className="w-full bg-[#0f152b] border border-[#243464] p-5 sm:p-6 rounded-3xl text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom duration-150 flex flex-col gap-4">
+              {/* Segmented Control Bar */}
+              <div className="flex justify-between items-center pb-2 border-b border-[#1b2548]">
+                <div className="flex p-1 rounded-2xl bg-[#0a0f22] border border-[#1f2a50] gap-1 w-full sm:w-auto">
+                  <button
+                    onClick={() => {
+                      setActiveTab("custom");
+                      playStepSound();
+                    }}
+                    className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      activeTab === "custom"
+                        ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <UserIcon className="w-3.5 h-3.5" />
+                    <span>Aspecto</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("match");
+                      playStepSound();
+                    }}
+                    className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      activeTab === "match"
+                        ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <GridIcon className="w-3.5 h-3.5" />
+                    <span>Arena & Pisos</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("players");
+                      playStepSound();
+                    }}
+                    className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      activeTab === "players"
+                        ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <UsersIcon className="w-3.5 h-3.5" />
+                    <span>Jugadores ({players.length})</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowLobbyDrawer(false)}
+                  className="w-7 h-7 rounded-xl bg-[#141b36] hover:bg-white/10 text-slate-400 hover:text-white text-xs flex items-center justify-center cursor-pointer ml-2"
+                >
+                  <CloseIcon className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Pestaña 1: Aspecto y Skin */}
+              {activeTab === "custom" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-150">
+                  {/* Apodo y Color */}
+                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Apodo del Jugador:</label>
+                      <input
+                        type="text"
+                        value={nickname}
+                        onChange={(e) => handleNameChange(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onKeyUp={(e) => e.stopPropagation()}
+                        onKeyPress={(e) => e.stopPropagation()}
+                        maxLength={15}
+                        className="w-full px-3 py-2 rounded-xl bg-[#0f152b] border border-[#243464] focus:border-cyan-400 focus:outline-none text-white text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Color del Traje:</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {COLOR_PALETTE.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => handleSelectColor(c.hex)}
+                            className={`h-7 rounded-xl transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+                              currentColor === c.hex
+                                ? "border-2 border-white scale-105 shadow-md"
+                                : "border border-white/20 opacity-70 hover:opacity-100"
+                            }`}
+                            style={{ backgroundColor: c.hex }}
+                            title={c.name}
+                          >
+                            {currentColor === c.hex && (
+                              <CheckIcon className="w-3.5 h-3.5 text-white" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selector de Skins (Estilo Badges de la Imagen) */}
+                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2">
+                    <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Skin de Avatar:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {SKINS_LIST.map((s) => {
+                        const Icon = s.Icon;
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => handleSelectSkin(s.id)}
+                            className={`flex items-center gap-2.5 p-3 rounded-2xl border transition-all cursor-pointer active:scale-95 ${
+                              currentSkin === s.id
+                                ? "bg-blue-600/25 border-blue-400 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                                : "bg-[#0f152b] border-[#1f2a50] text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded-xl bg-[#141b36] border border-[#243464] flex items-center justify-center text-white shrink-0">
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs font-black uppercase font-mono">{s.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pestaña 2: Modo y Arena (Estilo Game Cards: ROULETTE / CRASH / TOWERS) */}
+              {activeTab === "match" && (
+                <div className="flex flex-col gap-3.5 animate-in fade-in duration-150">
+                  {/* Selector de Arena */}
+                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Seleccionar Arena:</label>
+                      {!host && (
+                        <span className="text-[10px] font-mono text-cyan-400 font-bold">CONFIGURADO POR HOST</span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {MAPS_LIST.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => handleSelectMap(m.id)}
+                          disabled={!host}
+                          className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between gap-3 ${
+                            mapId === m.id
+                              ? "bg-gradient-to-br from-[#122b52] to-[#0f1730] border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+                              : "bg-[#0f152b] border-[#1f2a50] hover:border-[#2b3a6d]"
+                          } ${!host ? "cursor-default" : "cursor-pointer active:scale-95"}`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#162142] text-cyan-300 border border-[#243464]">
+                              {m.badge}
+                            </span>
+                            {mapId === m.id && (
+                              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+                            )}
+                          </div>
+
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-white font-mono uppercase">{m.name}</span>
+                            <span className="text-xs text-slate-400">{m.desc}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Selector de Pisos */}
+                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Niveles de Pisos:</label>
+                      <span className="text-xs text-cyan-400 font-mono font-black">{floorsCount} NIVELES</span>
+                    </div>
+
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {FLOOR_OPTIONS.map((count) => (
+                        <button
+                          key={count}
+                          onClick={() => handleSelectFloorsBtn(count)}
+                          disabled={!host}
+                          className={`py-2.5 rounded-xl border text-center transition-all font-mono font-bold ${
+                            floorsCount === count
+                              ? "bg-blue-600 border-blue-400 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]"
+                              : "bg-[#0f152b] border-[#1f2a50] text-slate-400 hover:text-white"
+                          } ${!host ? "cursor-default" : "cursor-pointer active:scale-95"}`}
+                        >
+                          <span className="text-xs">{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pestaña 3: Jugadores */}
+              {activeTab === "players" && (
+                <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2 max-h-60 overflow-y-auto animate-in fade-in duration-150 divide-y divide-[#182142]">
+                  <div className="flex justify-between text-[11px] font-mono uppercase font-bold text-slate-500 pb-1">
+                    <span>JUGADOR</span>
+                    <span>PUNTAJE</span>
+                  </div>
+
+                  {players.map((p) => {
+                    const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
+                    const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0284c7";
+                    const score = p.getState("globalScore") || 0;
+                    const skin = p.getState("skin") || "robot";
+                    const SkinComp = SKINS_LIST.find((s) => s.id === skin)?.Icon || RobotSkinIcon;
+                    const isAfk = Boolean(p.getState("isAfk"));
+
+                    return (
+                      <div key={p.id} className="flex justify-between items-center pt-2 text-xs">
+                        <div className="flex items-center gap-2.5 truncate">
+                          <div
+                            className="w-7 h-7 rounded-xl flex items-center justify-center text-white border border-white/20 shrink-0 shadow-sm"
+                            style={{ backgroundColor: pColor }}
+                          >
+                            <SkinComp className="w-3.5 h-3.5 text-white" />
+                          </div>
+
+                          <div className="flex flex-col truncate">
+                            <span className="text-xs font-bold text-white truncate">{pName}</span>
+                            <span className="text-[9px] font-mono text-slate-400 font-semibold uppercase">
+                              {isAfk ? "AFK" : "CONECTADO"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {host && localPlayer && p.id !== localPlayer.id && isAfk && (
+                            <button
+                              onClick={() => handleKickPlayer(p.id, pName)}
+                              className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[10px] font-bold cursor-pointer"
+                            >
+                              Expulsar
+                            </button>
+                          )}
+                          <span className="text-xs font-mono font-bold text-amber-400 bg-[#141b36] px-2 py-1 rounded-lg border border-[#243464]">
+                            {score} PTS
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
-        </div>
-      </div>
+
+          {/* Barra de Control Inferior: Botón de Personalizar y Comenzar Partida */}
+          <div className="flex flex-wrap items-center justify-center gap-3 w-full">
+            <button
+              onClick={() => {
+                playStepSound();
+                setShowLobbyDrawer((prev) => !prev);
+              }}
+              className="px-5 py-3 rounded-2xl bg-[#0f152b] hover:bg-[#141b36] border border-[#243464] hover:border-cyan-400 text-xs font-bold text-slate-200 hover:text-white flex items-center gap-2 cursor-pointer transition-all shadow-md active:scale-95"
+            >
+              <SettingsIcon className="w-4 h-4 text-cyan-400" />
+              <span>{showLobbyDrawer ? "Cerrar Configuración" : "Configurar Sala & Aspecto"}</span>
+            </button>
+
+            {host ? (
+              activePlayers.length >= 2 ? (
+                <button
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    onStartGame();
+                  }}
+                  className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-black uppercase tracking-wider shadow-[0_0_30px_rgba(37,99,235,0.7)] border border-blue-300/50 flex items-center gap-2.5 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                >
+                  <PlayIcon className="w-4 h-4 text-white" />
+                  <span>INICIAR PARTIDA</span>
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="px-6 py-3.5 rounded-2xl text-xs font-bold text-slate-500 bg-[#0f152b] border border-[#1f2a50] flex items-center gap-2 cursor-not-allowed font-mono"
+                  title="Se requieren al menos 2 jugadores activos"
+                >
+                  <span>MÍNIMO 2 JUGADORES ({activePlayers.length}/2)</span>
+                </button>
+              )
+            ) : (
+              <div className="px-5 py-3 rounded-2xl bg-[#0f152b] border border-[#243464] text-cyan-300 text-xs font-mono font-bold flex items-center gap-2 shadow-md">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span>ESPERANDO QUE EL ANFITRIÓN INICIE...</span>
+              </div>
+            )}
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
