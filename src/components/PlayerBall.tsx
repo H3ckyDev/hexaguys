@@ -6,7 +6,7 @@ import * as THREE from "three";
 
 import { CharacterModel } from "./CharacterModel";
 import type { PlayerState, GameStatus, MapId, SkinId } from "../types/game";
-import { SPAWN_RADIUS, LOBBY_X_OFFSET, FLOOR_Y_OFFSET } from "../constants/game";
+import { SPAWN_RADIUS, LOBBY_X_OFFSET, FLOOR_Y_OFFSET, FLOOR_SPACING } from "../constants/game";
 
 import { usePlayerControls } from "../hooks/usePlayerControls";
 import { useAfkTracker } from "../hooks/useAfkTracker";
@@ -51,7 +51,8 @@ export function PlayerBall({
   const lobbySpawnY = 0.65;
   const lobbySpawnZ = Math.sin(angle) * Math.min(2.2, spawnDist);
 
-  const topFloorY = (floorsCount - 1) * 4.5;
+  const numFloors = Math.max(2, Math.min(8, floorsCount));
+  const topFloorY = (numFloors - 1) * FLOOR_SPACING;
   const matchSpawnX = Math.cos(angle) * spawnDist;
   const matchSpawnY = topFloorY + FLOOR_Y_OFFSET;
   const matchSpawnZ = Math.sin(angle) * spawnDist;

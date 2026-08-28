@@ -57,14 +57,14 @@ interface HexTileProps {
 function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTileProps) {
   const [isBroken, setIsBroken] = useState(false);
   const [scaleY, setScaleY] = useState(1);
-  const [posY, setPosY] = useState(position[1]);
+  const [dropY, setDropY] = useState(0);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
 
   useEffect(() => {
     if (steppedAt === null) {
       setIsBroken(false);
       setScaleY(1);
-      setPosY(position[1]);
+      setDropY(0);
       return;
     }
 
@@ -81,7 +81,7 @@ function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTilePro
       }, remaining);
       return () => clearTimeout(timer);
     }
-  }, [steppedAt, position]);
+  }, [steppedAt]);
 
   // Actualización en tiempo real a 60-144 FPS dentro del bucle de Three.js
   useFrame((_, delta) => {
@@ -110,8 +110,8 @@ function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTilePro
       setScaleY(1 - progress * 0.22 + wave);
     }
 
-    if (isBroken && posY > -25) {
-      setPosY((prev) => prev - delta * 20);
+    if (isBroken && dropY > -30) {
+      setDropY((prev) => prev - delta * 20);
       setScaleY((prev) => Math.max(0, prev - delta * 3));
     }
   });
@@ -156,9 +156,9 @@ function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTilePro
         />
       )}
 
-      {posY > -25 && (
+      {dropY > -30 && (
         <mesh
-          position={[0, isBroken ? posY - position[1] : 0, 0]}
+          position={[0, isBroken ? dropY : 0, 0]}
           scale={[1, scaleY, 1]}
           rotation={[0, Math.PI / 6, 0]}
           receiveShadow={!isBroken}
@@ -199,15 +199,14 @@ export function HexGrid({
 }: HexGridProps) {
   const [tiles, setTiles] = useState<Array<{ id: string; position: [number, number, number]; floor: number }>>([]);
   const isCountdown = gameStatus === "COUNTDOWN";
-  const floorDistance = FLOOR_SPACING;
   const numFloors = Math.max(2, Math.min(8, floorsCount));
-  const topFloorY = (numFloors - 1) * floorDistance;
+  const topFloorY = (numFloors - 1) * FLOOR_SPACING;
 
   useEffect(() => {
     const list: Array<{ id: string; position: [number, number, number]; floor: number }> = [];
 
     for (let f = 0; f < numFloors; f++) {
-      const floorY = (numFloors - 1 - f) * floorDistance;
+      const floorY = (numFloors - 1 - f) * FLOOR_SPACING;
       
       let rad = 4;
       if (mapId === "tower") {
@@ -229,7 +228,7 @@ export function HexGrid({
     }
 
     setTiles(list);
-  }, [mapId, numFloors, floorDistance]);
+  }, [mapId, numFloors]);
 
   // 6 muros de protección perimetrales durante el COUNTDOWN de 5s para evitar caídas previas
   const countdownWalls = [0, 1, 2, 3, 4, 5].map((i) => {
@@ -246,10 +245,10 @@ export function HexGrid({
 
   return (
     <group>
-      {/* Baldosas hexagonales del juego */}
+      {/* Baldosas hexagonales del juego con clave única vinculada al número de pisos para evitar reuso erróneo */}
       {tiles.map((tile) => (
         <HexTile
-          key={tile.id}
+          key={`${mapId}_${numFloors}_${tile.id}`}
           position={tile.position}
           floor={tile.floor}
           steppedAt={brokenTiles[tile.id] || null}
@@ -260,7 +259,7 @@ export function HexGrid({
       {/* Muros de protección persistentes con sensor dinámico durante countdown */}
       {countdownWalls.map((w) => (
         <RigidBody
-          key={w.id}
+          key={`${numFloors}_${w.id}`}
           type="fixed"
           colliders={false}
           position={w.position}
