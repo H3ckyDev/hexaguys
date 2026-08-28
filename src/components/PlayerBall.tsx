@@ -22,6 +22,7 @@ interface PlayerBallProps {
   gameStatus: string;
   floorsCount?: number;
   showPlayerPing?: boolean;
+  isMobile?: boolean;
 }
 
 export function PlayerBall({
@@ -32,6 +33,7 @@ export function PlayerBall({
   gameStatus,
   floorsCount = 3,
   showPlayerPing = false,
+  isMobile = false,
 }: PlayerBallProps) {
   const rbRef = useRef<RapierRigidBody>(null);
   const visualRef = useRef<THREE.Group>(null);
@@ -68,12 +70,133 @@ export function PlayerBall({
   const [scoreNotification, setScoreNotification] = useState<{ amount: number; id: string; timestamp: number } | null>(null);
   const lastScoreNotificationId = useRef<string | null>(null);
   const scoreNotificationTimeout = useRef<number | null>(null);
+  const touchDirection = useRef({ x: 0, z: 0 });
+  const touchStart = useRef<{ x: number; y: number; time: number } | null>(null);
+  const touchJump = useRef(false);
 
   const playerColor = player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8";
   const playerName = player.getState("name") || player.getProfile()?.name || `Player ${player.id.slice(0, 3)}`;
   
   // Skin del jugador
   const skinType = player.getState("skin") || "robot";
+
+  useEffect(() => {
+    if (!isLocal || !isMobile) return;
+
+    const isInteractiveTarget = (target: EventTarget | null) => {
+      return target instanceof Element && Boolean(target.closest("button, input, textarea, a"));
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (isInteractiveTarget(event.target)) return;
+      const touch = event.changedTouches[0];
+      touchStart.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+      touchDirection.current = { x: 0, z: 0 };
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!touchStart.current) return;
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - touchStart.current.x;
+      const deltaY = touch.clientY - touchStart.current.y;
+      const distance = Math.hypot(deltaX, deltaY);
+      const maxDistance = 90;
+
+      if (distance > 8) {
+        event.preventDefault();
+        const strength = Math.min(distance, maxDistance) / maxDistance;
+        touchDirection.current = {
+          x: (deltaX / distance) * strength,
+          z: (deltaY / distance) * strength,
+        };
+      }
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (!touchStart.current) return;
+      const touch = event.changedTouches[0];
+      const distance = Math.hypot(
+        touch.clientX - touchStart.current.x,
+        touch.clientY - touchStart.current.y,
+      );
+      const duration = Date.now() - touchStart.current.time;
+
+      if (distance < 18 && duration < 350) {
+        touchJump.current = true;
+      }
+      touchStart.current = null;
+      touchDirection.current = { x: 0, z: 0 };
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isLocal, isMobile]);
+
+  useEffect(() => {
+    if (!isLocal || !isMobile) return;
+
+    const isInteractiveTarget = (target: EventTarget | null) => {
+      return target instanceof Element && Boolean(target.closest("button, input, textarea, a"));
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (isInteractiveTarget(event.target)) return;
+      const touch = event.changedTouches[0];
+      touchStart.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+      touchDirection.current = { x: 0, z: 0 };
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!touchStart.current) return;
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - touchStart.current.x;
+      const deltaY = touch.clientY - touchStart.current.y;
+      const distance = Math.hypot(deltaX, deltaY);
+      const maxDistance = 90;
+
+      if (distance > 8) {
+        event.preventDefault();
+        const strength = Math.min(distance, maxDistance) / maxDistance;
+        touchDirection.current = {
+          x: (deltaX / distance) * strength,
+          z: (deltaY / distance) * strength,
+        };
+      }
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (!touchStart.current) return;
+      const touch = event.changedTouches[0];
+      const distance = Math.hypot(
+        touch.clientX - touchStart.current.x,
+        touch.clientY - touchStart.current.y,
+      );
+      const duration = Date.now() - touchStart.current.time;
+
+      if (distance < 18 && duration < 350) {
+        touchJump.current = true;
+      }
+      touchStart.current = null;
+      touchDirection.current = { x: 0, z: 0 };
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isLocal, isMobile]);
 
   // Teletransporte fluido y restablecimiento de posición al cambiar entre Lobby (Caja de Cartón) y Partida (Torre)
   useEffect(() => {
@@ -253,6 +376,11 @@ export function PlayerBall({
           if (keys.left) vx -= speed;
           if (keys.right) vx += speed;
 
+          if (isMobile) {
+            vx = touchDirection.current.x * speed;
+            vz = touchDirection.current.z * speed;
+          }
+
           // Normalizar movimiento diagonal
           if (vx !== 0 && vz !== 0) {
             vx *= 0.7071;
@@ -261,9 +389,10 @@ export function PlayerBall({
 
         // Físicas de salto
         let vy = linvel.y;
-        if (canMove && keys.jump && grounded && Date.now() - lastJumpTime > 400) {
+        if (canMove && (keys.jump || touchJump.current) && grounded && Date.now() - lastJumpTime > 400) {
           vy = 8.0;
           setLastJumpTime(Date.now());
+          touchJump.current = false;
           playJumpSound();
         }
 
