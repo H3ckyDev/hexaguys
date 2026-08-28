@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { playBreakSound } from "../utils/sounds";
 
 export const HEX_RADIUS = 1.0;
-const STEP_DELAY = 1000; // 1.0 seconds delay before tile falls
+const STEP_DELAY = 500; // 0.5 seconds delay before tile falls
 
 interface HexTileProps {
   id: string;
@@ -164,17 +164,23 @@ interface HexGridProps {
 
 export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
   const [tiles, setTiles] = useState<any[]>([]);
-  // El piso del lobby y los muros de protección se mantienen activos en LOBBY y durante el COUNTDOWN de 5s
-  const isLobby = gameStatus === "LOBBY" || gameStatus === "COUNTDOWN";
+  const isLobby = gameStatus === "LOBBY";
+  const isCountdown = gameStatus === "COUNTDOWN";
   const floorDistance = 4.5;
   const topFloorY = (floorsCount - 1) * floorDistance;
 
   useEffect(() => {
-    const list: any[] = [];
-    const rad = mapId === "tower" ? 3 : 4; // 37 tiles for tower, 61 tiles for classic
-
+    // Si estamos en el Lobby (Caja de Cartón), no se renderizan las baldosas de la torre de juego
     if (isLobby) {
-      // IN LOBBY: Exactly 1 single wide floor at top elevation
+      setTiles([]);
+      return;
+    }
+
+    const list: any[] = [];
+    const rad = mapId === "tower" ? 3 : 4; // 37 baldosas para tower, 61 para classic
+
+    if (isCountdown) {
+      // DURANTE LA CUENTA REGRESIVA: Solo el piso superior con barreras protectoras
       const floorY = topFloorY;
       for (let q = -rad; q <= rad; q++) {
         const r1 = Math.max(-rad, -q - rad);
@@ -182,12 +188,12 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
         for (let r = r1; r <= r2; r++) {
           const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
           const z = HEX_RADIUS * 1.5 * r;
-          const id = `tile_lobby_${q}_${r}`;
+          const id = `tile_countdown_${q}_${r}`;
           list.push({ id, position: [x, floorY, z], floor: 0 });
         }
       }
     } else {
-      // IN MATCH: Load all N floors
+      // EN PARTIDA ACTIVA (PLAYING o ROUND_OVER): Cargar los N pisos de juego
       const numFloors = Math.max(2, Math.min(8, floorsCount));
       for (let f = 0; f < numFloors; f++) {
         const floorY = (numFloors - 1 - f) * floorDistance;
@@ -205,10 +211,10 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
     }
 
     setTiles(list);
-  }, [mapId, floorsCount, isLobby, topFloorY]);
+  }, [mapId, floorsCount, isLobby, isCountdown, topFloorY]);
 
-  // 6 perimeter barrier walls for the lobby so NOBODY can fall off
-  const lobbyWalls = [0, 1, 2, 3, 4, 5].map((i) => {
+  // 6 muros de protección perimetrales durante el COUNTDOWN de 5s para evitar caídas previas
+  const countdownWalls = [0, 1, 2, 3, 4, 5].map((i) => {
     const angle = (i * Math.PI) / 3 + Math.PI / 6;
     const dist = 6.8;
     const x = Math.cos(angle) * dist;
@@ -220,9 +226,11 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
     };
   });
 
+  if (isLobby) return null;
+
   return (
     <group>
-      {/* Floor tiles */}
+      {/* Baldosas hexagonales del juego */}
       {tiles.map((tile) => (
         <HexTile
           key={tile.id}
@@ -235,10 +243,10 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
         />
       ))}
 
-      {/* Safety Glass Barrier Walls in LOBBY (Nobody can fall off) */}
-      {isLobby && (
+      {/* Muros de protección holográfica durante la cuenta regresiva */}
+      {isCountdown && (
         <group>
-          {lobbyWalls.map((w) => (
+          {countdownWalls.map((w) => (
             <RigidBody
               key={w.id}
               type="fixed"
@@ -247,7 +255,7 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
               friction={0}
               restitution={0.2}
             >
-              {/* Sleek Energy Barrier Glass */}
+              {/* Cristal de energía */}
               <mesh castShadow receiveShadow>
                 <boxGeometry args={[7.8, 3.2, 0.3]} />
                 <meshStandardMaterial
@@ -260,7 +268,7 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
                   emissiveIntensity={0.3}
                 />
               </mesh>
-              {/* Glowing Top Rail */}
+              {/* Barra superior brillante */}
               <mesh position={[0, 1.6, 0]}>
                 <boxGeometry args={[7.85, 0.12, 0.35]} />
                 <meshStandardMaterial

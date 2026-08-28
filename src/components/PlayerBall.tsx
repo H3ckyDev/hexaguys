@@ -38,16 +38,30 @@ export function PlayerBall({
   const rbRef = useRef<RapierRigidBody>(null);
   const visualRef = useRef<THREE.Group>(null);
   
-  // Calculate distinct radial spawn position to guarantee zero collider overlaps on game start
+  // Cálculo de posiciones de aparición en la Caja de Cartón (Lobby en X=60) y en la Torre (Partida en X=0)
   const total = Math.max(1, totalPlayers);
   const angle = (playerIndex / total) * Math.PI * 2;
   const spawnDist = total > 1 ? 2.4 : 0;
-  const spawnX = Math.cos(angle) * spawnDist;
-  const spawnZ = Math.sin(angle) * spawnDist;
+  
+  // 1. Posición dentro de la Caja de Cartón del Lobby (Piso en Y=0.2, spawn en Y=1.0)
+  const lobbySpawnX = 60 + Math.cos(angle) * Math.min(2.2, spawnDist);
+  const lobbySpawnY = 1.0;
+  const lobbySpawnZ = Math.sin(angle) * Math.min(2.2, spawnDist);
+
+  // 2. Posición en la cima de la Torre Hexagonal
   const topFloorY = (floorsCount - 1) * 4.5;
-  const spawnY = topFloorY + 1.8;
+  const matchSpawnX = Math.cos(angle) * spawnDist;
+  const matchSpawnY = topFloorY + 1.8;
+  const matchSpawnZ = Math.sin(angle) * spawnDist;
+
+  // Determinar posición según el estado actual
+  const isLobbyMode = gameStatus === "LOBBY";
+  const spawnX = isLobbyMode ? lobbySpawnX : matchSpawnX;
+  const spawnY = isLobbyMode ? lobbySpawnY : matchSpawnY;
+  const spawnZ = isLobbyMode ? lobbySpawnZ : matchSpawnZ;
 
   const smoothCamTarget = useRef(new THREE.Vector3(spawnX, spawnY, spawnZ));
+  const prevGameStatusRef = useRef(gameStatus);
   const [, getKeys] = useKeyboardControls();
   const [lastJumpTime, setLastJumpTime] = useState(0);
   const [isGrounded, setIsGrounded] = useState(true);
@@ -63,7 +77,7 @@ export function PlayerBall({
   const playerColor = player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8";
   const playerName = player.getState("name") || player.getProfile()?.name || `Player ${player.id.slice(0, 3)}`;
   
-  // Fetch skin from playroom state (default to robot if not chosen)
+  // Skin del jugador
   const skinType = player.getState("skin") || "robot";
 
   useEffect(() => {
@@ -125,26 +139,103 @@ export function PlayerBall({
     };
   }, [isLocal, isMobile]);
 
-  // Restablecer posición del jugador de forma segura solo al volver al Lobby si estaba caído
   useEffect(() => {
-    if (isLocal && gameStatus === "LOBBY") {
-      const translation = rbRef.current?.translation();
-      if (!player.getState("isAlive") || (translation && translation.y < topFloorY - 2.0)) {
-        smoothCamTarget.current.set(spawnX, spawnY, spawnZ);
-        player.setState("pos", { x: spawnX, y: spawnY, z: spawnZ });
-        player.setState("vel", { x: 0, y: 0, z: 0 });
-        player.setState("isAlive", true);
-        player.setState("isMoving", false);
-        player.setState("isRunning", false);
-        
-        if (rbRef.current) {
-          rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
-          rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        }
+    if (!isLocal || !isMobile) return;
+
+    const isInteractiveTarget = (target: EventTarget | null) => {
+      return target instanceof Element && Boolean(target.closest("button, input, textarea, a"));
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (isInteractiveTarget(event.target)) return;
+      const touch = event.changedTouches[0];
+      touchStart.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+      touchDirection.current = { x: 0, z: 0 };
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!touchStart.current) return;
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - touchStart.current.x;
+      const deltaY = touch.clientY - touchStart.current.y;
+      const distance = Math.hypot(deltaX, deltaY);
+      const maxDistance = 90;
+
+      if (distance > 8) {
+        event.preventDefault();
+        const strength = Math.min(distance, maxDistance) / maxDistance;
+        touchDirection.current = {
+          x: (deltaX / distance) * strength,
+          z: (deltaY / distance) * strength,
+        };
+      }
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (!touchStart.current) return;
+      const touch = event.changedTouches[0];
+      const distance = Math.hypot(
+        touch.clientX - touchStart.current.x,
+        touch.clientY - touchStart.current.y,
+      );
+      const duration = Date.now() - touchStart.current.time;
+
+      if (distance < 18 && duration < 350) {
+        touchJump.current = true;
+      }
+      touchStart.current = null;
+      touchDirection.current = { x: 0, z: 0 };
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isLocal, isMobile]);
+
+  // Teletransporte fluido y restablecimiento de posición al cambiar entre Lobby (Caja de Cartón) y Partida (Torre)
+  useEffect(() => {
+    if (!isLocal) return;
+
+    // Inicialización al montar o al cambiar a LOBBY
+    if (gameStatus === "LOBBY") {
+      smoothCamTarget.current.set(lobbySpawnX, lobbySpawnY, lobbySpawnZ);
+      player.setState("pos", { x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ });
+      player.setState("vel", { x: 0, y: 0, z: 0 });
+      player.setState("isAlive", true);
+      player.setState("isMoving", false);
+      player.setState("isRunning", false);
+
+      if (rbRef.current) {
+        rbRef.current.setTranslation({ x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ }, true);
+        rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
     }
-  }, [gameStatus, isLocal, player, spawnX, spawnY, spawnZ, topFloorY]);
+
+    // Transición a COUNTDOWN / PLAYING (Ir a la Torre Hexagonal)
+    if ((gameStatus === "COUNTDOWN" || gameStatus === "PLAYING") && prevGameStatusRef.current === "LOBBY") {
+      smoothCamTarget.current.set(matchSpawnX, matchSpawnY, matchSpawnZ);
+      player.setState("pos", { x: matchSpawnX, y: matchSpawnY, z: matchSpawnZ });
+      player.setState("vel", { x: 0, y: 0, z: 0 });
+      player.setState("isAlive", true);
+      player.setState("isMoving", false);
+      player.setState("isRunning", false);
+
+      if (rbRef.current) {
+        rbRef.current.setTranslation({ x: matchSpawnX, y: matchSpawnY, z: matchSpawnZ }, true);
+        rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+    }
+
+    prevGameStatusRef.current = gameStatus;
+  }, [gameStatus, isLocal, player, lobbySpawnX, lobbySpawnY, lobbySpawnZ, matchSpawnX, matchSpawnY, matchSpawnZ]);
 
   // Detección de inactividad (AFK / Pestaña en segundo plano) y expulsión tras 60s (Se ignora si está chateando)
   useEffect(() => {
@@ -253,9 +344,12 @@ export function PlayerBall({
       const grounded = Math.abs(linvel.y) < 0.35;
       setIsGrounded(grounded);
 
-      // Auto-reaparición en LOBBY o COUNTDOWN si cae por el borde
-      if ((gameStatus === "LOBBY" || gameStatus === "COUNTDOWN") && translation.y < topFloorY - 1.5) {
-        rbRef.current.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
+      // Auto-reaparición de seguridad en LOBBY (Caja de Cartón) o COUNTDOWN (Torre)
+      if (gameStatus === "LOBBY" && translation.y < -5.0) {
+        rbRef.current.setTranslation({ x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ }, true);
+        rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      } else if (gameStatus === "COUNTDOWN" && translation.y < topFloorY - 1.5) {
+        rbRef.current.setTranslation({ x: matchSpawnX, y: matchSpawnY, z: matchSpawnZ }, true);
         rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
       }
 
@@ -385,13 +479,20 @@ export function PlayerBall({
           );
         }
       } else {
-        smoothCamTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+        const defaultCamCenter = isLobbyMode
+          ? new THREE.Vector3(lobbySpawnX, lobbySpawnY, lobbySpawnZ)
+          : new THREE.Vector3(0, topFloorY / 2, 0);
+        smoothCamTarget.current.lerp(defaultCamCenter, 0.05);
         state.camera.position.set(
           smoothCamTarget.current.x,
-          smoothCamTarget.current.y + 15,
-          smoothCamTarget.current.z + 18
+          smoothCamTarget.current.y + (isLobbyMode ? 6.8 : 15),
+          smoothCamTarget.current.z + (isLobbyMode ? 8.8 : 18)
         );
-        state.camera.lookAt(0, 0, 0);
+        state.camera.lookAt(
+          smoothCamTarget.current.x,
+          smoothCamTarget.current.y + (isLobbyMode ? 0.5 : 0),
+          smoothCamTarget.current.z
+        );
       }
     }
     // 2. INTERPOLACIÓN DE JUGADORES REMOTOS
@@ -536,7 +637,7 @@ export function PlayerBall({
                 {showPlayerPing && (
                   <span className="text-[9px] text-sky-300 font-mono bg-sky-950/80 px-1 py-0.2 rounded border border-sky-400/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
-                    {player.getState("ping") || (isLocal ? 24 : 32)}ms
+                    {player.getState("ping") ?? 0}ms
                   </span>
                 )}
                 <span className="text-[9px] text-slate-400 capitalize bg-slate-800 px-1 rounded">

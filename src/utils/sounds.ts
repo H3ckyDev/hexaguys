@@ -1,5 +1,6 @@
 let audioCtx: AudioContext | null = null;
 let globalVolume = 0.5; // Default volume is 50%
+import tileBreakAudioUrl from "./baldosa_cae.mp3";
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -70,25 +71,11 @@ export function playStepSound() {
 
 export function playBreakSound() {
   try {
-    const ctx = getAudioContext();
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = "sawtooth"; // Sawtooth sounds more gritty/broken
-    osc.frequency.setValueAtTime(350, now);
-    osc.frequency.linearRampToValueAtTime(60, now + 0.3);
-
-    gain.gain.setValueAtTime(0.2 * globalVolume, now);
-    gain.gain.linearRampToValueAtTime(0.01 * globalVolume, now + 0.3);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.3);
+    const audio = new Audio(tileBreakAudioUrl);
+    audio.volume = globalVolume;
+    void audio.play();
   } catch (e) {
-    console.warn(e);
+    console.warn("Audio error:", e);
   }
 }
 

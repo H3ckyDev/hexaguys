@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { isHost } from "playroomkit";
+import { isHost, myPlayer } from "playroomkit";
 
 interface PerformanceHUDProps {
   showFps?: boolean;
@@ -33,6 +33,7 @@ export function PerformanceHUD({ showFps = true, showPing = true }: PerformanceH
   useEffect(() => {
     if (isHost()) {
       setPing(0);
+      myPlayer()?.setState("ping", 0);
       return;
     }
 
@@ -48,11 +49,16 @@ export function PerformanceHUD({ showFps = true, showPing = true }: PerformanceH
         const rtt = Math.round(performance.now() - t0);
         const cleanRtt = Math.max(8, Math.min(250, rtt));
         // Suavizado exponencial para evitar saltos bruscos
-        setPing((prev) => (prev === 0 ? cleanRtt : Math.round(prev * 0.3 + cleanRtt * 0.7)));
+        setPing((prev) => {
+          const nextPing = prev === 0 ? cleanRtt : Math.round(prev * 0.3 + cleanRtt * 0.7);
+          myPlayer()?.setState("ping", nextPing);
+          return nextPing;
+        });
       } catch {
         // Estimación estándar de red en caso de bloqueo offline
         const fallback = Math.floor(Math.random() * 6 + 22);
         setPing(fallback);
+        myPlayer()?.setState("ping", fallback);
       }
     };
 
