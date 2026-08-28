@@ -65,19 +65,21 @@ export function usePlayerPhysics({
     const translation = rb.translation();
     const isAlive = player.getState("isAlive") !== false;
 
-    // Raycast for ground detection
-    const origin = { x: translation.x, y: translation.y - 0.1, z: translation.z };
+    // Raycast for ground detection:
+    // Capsule bottom is at translation.y - 0.42. Origin is placed slightly below (translation.y - 0.43)
+    // pointing downwards so it never hits the player's own collider.
+    const origin = { x: translation.x, y: translation.y - 0.43, z: translation.z };
     const direction = { x: 0, y: -1, z: 0 };
     const ray = new rapier.Ray(origin, direction);
-    const hit = world.castRay(ray, 0.4, true);
-    const grounded = hit !== null;
+    const hit = world.castRay(ray, 0.22, true);
+    const grounded = hit !== null && linvel.y <= 0.8 && linvel.y >= -15.0;
     isGroundedRef.current = grounded;
 
     // Safety despawn
-    if ((gameStatus === "LOBBY" || gameStatus === "ROUND_OVER") && translation.y < -5.0) {
+    if ((gameStatus === "LOBBY" || gameStatus === "ROUND_OVER") && translation.y < -3.0) {
       rb.setTranslation({ x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ }, true);
       rb.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    } else if (gameStatus === "COUNTDOWN" && translation.y < topFloorY - 1.5) {
+    } else if (gameStatus === "COUNTDOWN" && translation.y < topFloorY - 1.0) {
       rb.setTranslation({ x: matchSpawnX, y: matchSpawnY, z: matchSpawnZ }, true);
       rb.setLinvel({ x: 0, y: 0, z: 0 }, true);
     }
@@ -118,6 +120,7 @@ export function usePlayerPhysics({
       if (canMove && (keys.jump || touchJump) && grounded && Date.now() - lastJumpTime.current > JUMP_COOLDOWN_MS) {
         vy = JUMP_VELOCITY;
         lastJumpTime.current = Date.now();
+        isGroundedRef.current = false;
         playJumpSound();
       } else if (vy > 8.0) {
         vy = 8.0;

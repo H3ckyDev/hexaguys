@@ -14,6 +14,7 @@ import { useTileDetector } from "../hooks/useTileDetector";
 import { usePlayerNetwork } from "../hooks/usePlayerNetwork";
 import { usePlayerCamera } from "../hooks/usePlayerCamera";
 import { usePlayerPhysics } from "../hooks/usePlayerPhysics";
+import { activeLocalPlayerPos } from "../utils/playerTracking";
 
 interface PlayerBallProps {
   player: PlayerState;
@@ -47,7 +48,7 @@ export function PlayerBall({
   const spawnDist = total > 1 ? SPAWN_RADIUS : 0;
   
   const lobbySpawnX = LOBBY_X_OFFSET + Math.cos(angle) * Math.min(2.2, spawnDist);
-  const lobbySpawnY = 1.0;
+  const lobbySpawnY = 0.65;
   const lobbySpawnZ = Math.sin(angle) * Math.min(2.2, spawnDist);
 
   const topFloorY = (floorsCount - 1) * 4.5;
@@ -122,9 +123,14 @@ export function PlayerBall({
 
       if (physicsResult) {
         const { translation, velocity, grounded, horizontalSpeed } = physicsResult;
+        activeLocalPlayerPos.x = translation.x;
+        activeLocalPlayerPos.y = translation.y;
+        activeLocalPlayerPos.z = translation.z;
+        activeLocalPlayerPos.isAlive = player.getState("isAlive") !== false;
+
         broadcastState(translation, velocity);
 
-        if (gameStatus === "PLAYING" && (grounded || Math.abs(velocity.y) < 1.6)) {
+        if (gameStatus === "PLAYING" && grounded && Math.abs(velocity.y) < 1.2) {
           detectTiles(translation.x, translation.y, translation.z, horizontalSpeed);
         }
       }
@@ -153,7 +159,7 @@ export function PlayerBall({
   const skinType = player.getState("skin") || "robot";
   
   const lastChat = player.getState<{text: string, timestamp: number}>("lastChat");
-  const isChatActive = lastChat && Date.now() - lastChat.timestamp < 4500;
+  const isChatActive = isLobbyMode && lastChat && Date.now() - lastChat.timestamp < 4500;
   const isAfk = Boolean(player.getState("isAfk"));
 
   return (
@@ -177,9 +183,12 @@ export function PlayerBall({
             type={skinType as SkinId}
             avatar={player.getState("avatar")}
             color={playerColor as string}
-            isMoving={isMovingRef.current}
-            isGrounded={isLocal ? isGroundedRef.current : (player.getState<{y: number}>("vel") ? Math.abs(player.getState<{y: number}>("vel")!.y) < 0.35 : true)}
-            isRunning={isRunningRef.current}
+            isMovingRef={isLocal ? isMovingRef : undefined}
+            isGroundedRef={isLocal ? isGroundedRef : undefined}
+            isRunningRef={isLocal ? isRunningRef : undefined}
+            isMoving={!isLocal ? Boolean(player.getState("isMoving")) : undefined}
+            isGrounded={!isLocal ? (player.getState<{y: number}>("vel") ? Math.abs(player.getState<{y: number}>("vel")!.y) < 0.8 : true) : undefined}
+            isRunning={!isLocal ? Boolean(player.getState("isRunning")) : undefined}
           />
         </group>
 

@@ -25,7 +25,7 @@ export const PLAYER_DAMPING = 0.4;
 export const FLOOR_SPACING = 4.5;
 export const LOBBY_X_OFFSET = 60;
 export const SPAWN_RADIUS = 2.4;
-export const FLOOR_Y_OFFSET = 1.2;
+export const FLOOR_Y_OFFSET = 0.65;
 
 // Void & death
 export const VOID_THRESHOLD_Y = -8;

@@ -11,7 +11,8 @@ import {
   deserializeAvatar,
   normalizeColor,
 } from "../utils/avatarGenerator";
-import { COLOR_PALETTE, STORAGE_KEYS } from "../constants/ui";
+import { COLOR_PALETTE } from "../constants/ui";
+import { getActiveProfile, getCurrentUser, saveUserProfile } from "../services/authService";
 
 // Sub-components
 import { GameHeader } from "./game-ui/GameHeader";
@@ -25,6 +26,7 @@ import { AvatarCustomizerTab } from "./game-ui/lobby/AvatarCustomizerTab";
 import { ArenaSettingsTab } from "./game-ui/lobby/ArenaSettingsTab";
 import { LobbyPlayersTab } from "./game-ui/lobby/LobbyPlayersTab";
 import { LobbyFooterControls } from "./game-ui/lobby/LobbyFooterControls";
+import { FadeTransitionOverlay } from "./FadeTransitionOverlay";
 
 interface GameUIProps {
   players: any[];
@@ -86,27 +88,22 @@ export function GameUI({
 
   // Avatar and Nickname State
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.AVATAR_CONFIG) : null;
-    return deserializeAvatar(saved, currentColor);
+    return getActiveProfile()?.avatarConfig || deserializeAvatar(localPlayer?.getState("avatar"), currentColor);
   });
 
   const [nickname, setNickname] = useState(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.USERNAME) : null;
-    return saved || localPlayer?.getState("name") || localPlayer?.getProfile()?.name || `Jugador_${Math.floor(Math.random() * 900 + 100)}`;
+    return getActiveProfile()?.nickname || localPlayer?.getState("name") || localPlayer?.getProfile()?.name || `Jugador_${Math.floor(Math.random() * 900 + 100)}`;
   });
 
   const updateAvatar = useCallback((newConfig: AvatarConfig) => {
     setAvatarConfig(newConfig);
     const serialized = serializeAvatar(newConfig);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(STORAGE_KEYS.AVATAR_CONFIG, serialized);
-      } catch (e) {
-        console.warn("Error al persistir avatar:", e);
-      }
-    }
     if (localPlayer) {
       localPlayer.setState("avatar", serialized);
+    }
+    const user = getCurrentUser();
+    if (user) {
+      saveUserProfile(user.uid, { avatarConfig: newConfig, color: newConfig.color });
     }
   }, [localPlayer]);
 
@@ -124,12 +121,9 @@ export function GameUI({
 
   const handleNameChange = useCallback((cleanName: string) => {
     setNickname(cleanName);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(STORAGE_KEYS.USERNAME, cleanName);
-      } catch (e) {
-        console.warn("Error al persistir apodo:", e);
-      }
+    const user = getCurrentUser();
+    if (user) {
+      saveUserProfile(user.uid, { nickname: cleanName });
     }
   }, []);
 
@@ -180,6 +174,9 @@ export function GameUI({
 
   return (
     <div className={`absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-30 select-none font-sans antialiased ${isMobile ? "mobile-game-ui" : ""}`}>
+      {/* Transición cinematográfica suave entre lobby y partida */}
+      <FadeTransitionOverlay gameStatus={gameStatus} />
+
       {/* 1. BARRA SUPERIOR HUD VISOR */}
       <div className="relative pointer-events-none">
         <GameHeader
@@ -208,7 +205,7 @@ export function GameUI({
       </div>
 
       {/* 2. OVERLAYS EN PARTIDA Y MODALES */}
-      <div className="flex-1 flex items-center justify-center pointer-events-auto my-auto relative z-40">
+      <div className="flex-1 flex items-center justify-center pointer-events-none my-auto relative z-40">
         {gameStatus === "COUNTDOWN" && (
           <CountdownOverlay countdown={countdown} />
         )}

@@ -3,6 +3,8 @@ import { onPlayerJoin, isHost, setState, getState, RPC, myPlayer, getRoomCode } 
 import { sileo } from "sileo";
 import { initPlayroom } from "../playroom";
 import { playChatSound } from "../utils/sounds";
+import { serializeAvatar } from "../utils/avatarGenerator";
+import { getActiveProfile } from "../services/authService";
 import type { PlayerState, GameStatus, MapId, ChatMessage } from "../types/game";
 import { ROOM_STATE_POLL_INTERVAL_MS } from "../constants/game";
 
@@ -35,6 +37,23 @@ export function usePlayroomSession(isInGame: boolean, roomCodeToJoin: string | n
         if (!getState("countdown")) setState("countdown", 5);
         if (!getState("mapId")) setState("mapId", "classic");
         if (!getState("floorsCount")) setState("floorsCount", 3);
+      }
+
+      // Sincronizar perfil activo en el estado del jugador local
+      const currentRoomStatus = getState("status") || "LOBBY";
+      const localP = myPlayer();
+      const active = getActiveProfile();
+      if (localP) {
+        if (active) {
+          localP.setState("name", active.nickname);
+          localP.setState("avatar", serializeAvatar(active.avatarConfig));
+          localP.setState("color", active.color);
+        }
+        if (currentRoomStatus === "PLAYING" || currentRoomStatus === "COUNTDOWN") {
+          localP.setState("isAlive", false);
+          localP.setState("isSpectator", true);
+          localP.setState("deathReason", "midgame_join");
+        }
       }
 
       RPC.register("stepOnTile", async (tileId: string) => {
@@ -81,6 +100,14 @@ export function usePlayroomSession(isInGame: boolean, roomCodeToJoin: string | n
           player.setState("globalScore", 0);
         }
 
+        // Si la partida ya empezó, el nuevo jugador entra como espectador
+        const activeStatus = getState("status") || "LOBBY";
+        if (activeStatus === "PLAYING" || activeStatus === "COUNTDOWN") {
+          player.setState("isAlive", false);
+          player.setState("isSpectator", true);
+          player.setState("deathReason", "midgame_join");
+        }
+
         const pName = player.getState("name") || player.getProfile()?.name || `Jugador ${player.id.slice(0, 3)}`;
         sileo.info({
           title: "Jugador conectado",
@@ -102,10 +129,10 @@ export function usePlayroomSession(isInGame: boolean, roomCodeToJoin: string | n
         });
       });
     }).catch((err) => {
-      console.error('Connection failed:', err);
+      console.error("Connection failed:", err);
       setConnectionError(true);
     });
-  }, [isInGame]);
+  }, [isInGame, roomCodeToJoin]);
 
   useEffect(() => {
     if (!connected) return;

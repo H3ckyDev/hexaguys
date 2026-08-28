@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useKeyboardControls } from "@react-three/drei";
+import { mobileControlsState } from "../utils/mobileControls";
 
 export function usePlayerControls(isLocal: boolean, isMobile: boolean = false) {
   const [, getKeys] = useKeyboardControls();
@@ -11,18 +12,20 @@ export function usePlayerControls(isLocal: boolean, isMobile: boolean = false) {
     if (!isLocal || !isMobile) return;
 
     const isInteractiveTarget = (target: EventTarget | null) => {
-      return target instanceof Element && Boolean(target.closest("button, input, textarea, a"));
+      return target instanceof Element && Boolean(target.closest("button, input, textarea, a, [role='button']"));
     };
 
     const handleTouchStart = (event: TouchEvent) => {
       if (isInteractiveTarget(event.target)) return;
       const touch = event.changedTouches[0];
       touchStart.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
-      touchDirection.current = { x: 0, z: 0 };
     };
 
     const handleTouchMove = (event: TouchEvent) => {
       if (!touchStart.current) return;
+      // Solo si no se está usando el joystick HUD dedicado
+      if (mobileControlsState.x !== 0 || mobileControlsState.z !== 0) return;
+
       const touch = event.changedTouches[0];
       const deltaX = touch.clientX - touchStart.current.x;
       const deltaY = touch.clientY - touchStart.current.y;
@@ -44,7 +47,7 @@ export function usePlayerControls(isLocal: boolean, isMobile: boolean = false) {
       const touch = event.changedTouches[0];
       const distance = Math.hypot(
         touch.clientX - touchStart.current.x,
-        touch.clientY - touchStart.current.y,
+        touch.clientY - touchStart.current.y
       );
       const duration = Date.now() - touchStart.current.time;
 
@@ -52,7 +55,9 @@ export function usePlayerControls(isLocal: boolean, isMobile: boolean = false) {
         touchJump.current = true;
       }
       touchStart.current = null;
-      touchDirection.current = { x: 0, z: 0 };
+      if (mobileControlsState.x === 0 && mobileControlsState.z === 0) {
+        touchDirection.current = { x: 0, z: 0 };
+      }
     };
 
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
@@ -66,5 +71,44 @@ export function usePlayerControls(isLocal: boolean, isMobile: boolean = false) {
     };
   }, [isLocal, isMobile]);
 
-  return { getKeys, touchDirection, touchJump };
+  // Getter unificado para inputs de teclado + joystick móvil
+  const unifiedGetKeys = () => {
+    const keys = getKeys();
+    if (isMobile) {
+      return {
+        ...keys,
+        jump: Boolean(keys.jump || mobileControlsState.jump),
+        sprint: Boolean(keys.sprint || mobileControlsState.sprint),
+      };
+    }
+    return keys;
+  };
+
+  const dynamicTouchDirection = {
+    get current() {
+      if (isMobile && (mobileControlsState.x !== 0 || mobileControlsState.z !== 0)) {
+        return { x: mobileControlsState.x, z: mobileControlsState.z };
+      }
+      return touchDirection.current;
+    },
+    set current(val: { x: number; z: number }) {
+      touchDirection.current = val;
+    },
+  };
+
+  const dynamicTouchJump = {
+    get current() {
+      return touchJump.current || mobileControlsState.jump;
+    },
+    set current(val: boolean) {
+      touchJump.current = val;
+      if (!val) mobileControlsState.jump = false;
+    },
+  };
+
+  return {
+    getKeys: unifiedGetKeys,
+    touchDirection: dynamicTouchDirection,
+    touchJump: dynamicTouchJump,
+  };
 }

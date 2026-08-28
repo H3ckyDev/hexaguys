@@ -1,4 +1,5 @@
 import type { AvatarConfig } from "../types/game";
+export type { AvatarConfig };
 
 export const HEAD_NAMES = [
   "Cyber Terminal",

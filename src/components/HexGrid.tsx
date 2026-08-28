@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { RigidBody, CylinderCollider, CuboidCollider } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import { playBreakSound } from "../utils/sounds";
+import { TILE_STEP_DELAY_MS, FLOOR_SPACING } from "../constants/game";
+import { activeLocalPlayerPos } from "../utils/playerTracking";
 
 export const HEX_RADIUS = 1.0;
-const STEP_DELAY = 850; // 0.85 segundos de tiempo de reacción equilibrado antes de la caída
+const STEP_DELAY = TILE_STEP_DELAY_MS;
 
 /**
  * Convierte coordenadas 3D de mundo (X, Z) a coordenadas hexagonales axiales (Q, R)
@@ -32,10 +35,15 @@ export function worldToHex(x: number, z: number, hexRadius = HEX_RADIUS) {
 }
 
 /**
- * Comprueba si una coordenada hexagonal axial (Q, R) pertenece al tablero
+ * Comprueba si una coordenada hexagonal axial (Q, R) pertenece al tablero según el mapa y piso
  */
-export function isHexInGrid(q: number, r: number, mapId = "classic") {
-  const rad = mapId === "tower" ? 3 : 4;
+export function isHexInGrid(q: number, r: number, mapId = "classic", floor = 0) {
+  let rad = 4;
+  if (mapId === "tower") {
+    rad = 3;
+  } else if (mapId === "hourglass") {
+    rad = Math.max(2, 4 - floor);
+  }
   return Math.abs(q) <= rad && Math.abs(r) <= rad && Math.abs(-q - r) <= rad;
 }
 
@@ -43,12 +51,14 @@ interface HexTileProps {
   position: [number, number, number];
   floor: number;
   steppedAt: number | null;
+  gameStatus?: string;
 }
 
-function HexTileComponent({ position, floor, steppedAt }: HexTileProps) {
+function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTileProps) {
   const [isBroken, setIsBroken] = useState(false);
   const [scaleY, setScaleY] = useState(1);
   const [posY, setPosY] = useState(position[1]);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
 
   useEffect(() => {
     if (steppedAt === null) {
@@ -73,8 +83,24 @@ function HexTileComponent({ position, floor, steppedAt }: HexTileProps) {
     }
   }, [steppedAt, position]);
 
-  // Animación optimizada: solo corre para baldosas activas (pisadas o cayendo)
+  // Actualización en tiempo real a 60-144 FPS dentro del bucle de Three.js
   useFrame((_, delta) => {
+    // 1. Transparencia en tiempo real de pisos superiores
+    if (matRef.current) {
+      const isPlaying = gameStatus === "PLAYING";
+      const isNearArena = activeLocalPlayerPos.isAlive && (Math.hypot(activeLocalPlayerPos.x, activeLocalPlayerPos.z) < 14);
+      const isAbove = isPlaying && isNearArena && (position[1] > activeLocalPlayerPos.y + 1.2);
+
+      const targetOpacity = isAbove ? 0.22 : 1.0;
+      if (Math.abs(matRef.current.opacity - targetOpacity) > 0.01) {
+        matRef.current.transparent = isAbove;
+        matRef.current.opacity = targetOpacity;
+        matRef.current.depthWrite = !isAbove;
+        matRef.current.needsUpdate = true;
+      }
+    }
+
+    // 2. Animación de baldosas pisadas / colapso
     if (steppedAt === null && !isBroken) return;
 
     if (steppedAt !== null && !isBroken) {
@@ -84,36 +110,32 @@ function HexTileComponent({ position, floor, steppedAt }: HexTileProps) {
       setScaleY(1 - progress * 0.22 + wave);
     }
 
-    if (isBroken && posY > -20) {
-      // Caída al vacío
-      setPosY((prev) => prev - delta * 15);
-      setScaleY((prev) => Math.max(0, prev - delta * 2));
+    if (isBroken && posY > -25) {
+      setPosY((prev) => prev - delta * 20);
+      setScaleY((prev) => Math.max(0, prev - delta * 3));
     }
   });
 
   const FLOOR_COLORS = [
-    "#38bdf8", // Sky Blue
-    "#818cf8", // Indigo
-    "#a855f7", // Purple
-    "#ec4899", // Pink
-    "#f43f5e", // Rose
-    "#fb923c", // Orange
-    "#facc15", // Gold
-    "#34d399", // Emerald
+    "#38bdf8", // Sky Blue (Piso 0 / Superior)
+    "#818cf8", // Indigo (Piso 1)
+    "#a855f7", // Purple (Piso 2)
+    "#ec4899", // Pink (Piso 3)
+    "#f43f5e", // Rose (Piso 4)
+    "#fb923c", // Orange (Piso 5)
+    "#facc15", // Gold (Piso 6)
+    "#34d399", // Emerald (Piso 7)
   ];
 
-  // Define color based on floor index
   let color = FLOOR_COLORS[floor % FLOOR_COLORS.length];
 
   if (steppedAt !== null) {
     const elapsed = Date.now() - steppedAt;
     if (elapsed < 380) {
-      // Fase 1: Advertencia ámbar
-      color = "#f59e0b";
+      color = "#f59e0b"; // Fase 1: Advertencia ámbar
     } else {
-      // Fase 2: Parpadeo carmesí urgente antes del colapso
       const isBlink = Math.floor((elapsed - 380) / 90) % 2 === 0;
-      color = isBlink ? "#f43f5e" : "#e11d48";
+      color = isBlink ? "#f43f5e" : "#e11d48"; // Fase 2: Parpadeo carmesí
     }
   }
 
@@ -125,15 +147,16 @@ function HexTileComponent({ position, floor, steppedAt }: HexTileProps) {
       friction={0}
       restitution={0}
     >
-      <CylinderCollider
-        args={[0.2, HEX_RADIUS * 1.0]}
-        sensor={isBroken}
-        friction={0}
-        restitution={0}
-      />
+      {/* El colisionador físico se desmonta de inmediato al romperse */}
+      {!isBroken && (
+        <CylinderCollider
+          args={[0.2, HEX_RADIUS * 0.98]}
+          friction={0}
+          restitution={0}
+        />
+      )}
 
-      {/* Mesh visual animado: se muestra mientras no haya caído al abismo */}
-      {posY > -20 && (
+      {posY > -25 && (
         <mesh
           position={[0, isBroken ? posY - position[1] : 0, 0]}
           scale={[1, scaleY, 1]}
@@ -142,11 +165,15 @@ function HexTileComponent({ position, floor, steppedAt }: HexTileProps) {
         >
           <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
           <meshStandardMaterial
+            ref={matRef}
             color={color}
             roughness={0.3}
             metalness={0.1}
-            emissive={steppedAt !== null ? "#e11d48" : "#000000"}
-            emissiveIntensity={steppedAt !== null ? 0.5 : 0}
+            transparent={false}
+            opacity={1.0}
+            depthWrite={true}
+            emissive={steppedAt !== null ? "#e11d48" : color}
+            emissiveIntensity={steppedAt !== null ? 0.6 : 0.08}
           />
         </mesh>
       )}
@@ -164,20 +191,31 @@ interface HexGridProps {
   gameStatus?: string;
 }
 
-export function HexGrid({ brokenTiles, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
-  const [tiles, setTiles] = useState<any[]>([]);
+export function HexGrid({
+  brokenTiles,
+  mapId,
+  floorsCount = 3,
+  gameStatus,
+}: HexGridProps) {
+  const [tiles, setTiles] = useState<Array<{ id: string; position: [number, number, number]; floor: number }>>([]);
   const isCountdown = gameStatus === "COUNTDOWN";
-  const floorDistance = 4.5;
-  const topFloorY = (floorsCount - 1) * floorDistance;
+  const floorDistance = FLOOR_SPACING;
+  const numFloors = Math.max(2, Math.min(8, floorsCount));
+  const topFloorY = (numFloors - 1) * floorDistance;
 
   useEffect(() => {
-    // Generar la torre completa de baldosas de forma estable y persistente (evita recrear colisionadores entre estados)
-    const list: any[] = [];
-    const rad = mapId === "tower" ? 3 : 4; // 37 baldosas para tower, 61 para classic
-    const numFloors = Math.max(2, Math.min(8, floorsCount));
+    const list: Array<{ id: string; position: [number, number, number]; floor: number }> = [];
 
     for (let f = 0; f < numFloors; f++) {
       const floorY = (numFloors - 1 - f) * floorDistance;
+      
+      let rad = 4;
+      if (mapId === "tower") {
+        rad = 3;
+      } else if (mapId === "hourglass") {
+        rad = Math.max(2, 4 - f);
+      }
+
       for (let q = -rad; q <= rad; q++) {
         const r1 = Math.max(-rad, -q - rad);
         const r2 = Math.min(rad, -q + rad);
@@ -191,12 +229,12 @@ export function HexGrid({ brokenTiles, mapId, floorsCount = 3, gameStatus }: Hex
     }
 
     setTiles(list);
-  }, [mapId, floorsCount, floorDistance]);
+  }, [mapId, numFloors, floorDistance]);
 
   // 6 muros de protección perimetrales durante el COUNTDOWN de 5s para evitar caídas previas
   const countdownWalls = [0, 1, 2, 3, 4, 5].map((i) => {
     const angle = (i * Math.PI) / 3 + Math.PI / 6;
-    const dist = 6.8;
+    const dist = mapId === "tower" ? 5.2 : 6.8;
     const x = Math.cos(angle) * dist;
     const z = Math.sin(angle) * dist;
     return {
@@ -208,17 +246,18 @@ export function HexGrid({ brokenTiles, mapId, floorsCount = 3, gameStatus }: Hex
 
   return (
     <group>
-      {/* Baldosas hexagonales del juego (siempre montadas de forma estable) */}
+      {/* Baldosas hexagonales del juego */}
       {tiles.map((tile) => (
         <HexTile
           key={tile.id}
           position={tile.position}
           floor={tile.floor}
           steppedAt={brokenTiles[tile.id] || null}
+          gameStatus={gameStatus}
         />
       ))}
 
-      {/* Muros de protección persistentes con sensor dinámico */}
+      {/* Muros de protección persistentes con sensor dinámico durante countdown */}
       {countdownWalls.map((w) => (
         <RigidBody
           key={w.id}
@@ -226,41 +265,25 @@ export function HexGrid({ brokenTiles, mapId, floorsCount = 3, gameStatus }: Hex
           colliders={false}
           position={w.position}
           rotation={w.rotation}
-          friction={0}
-          restitution={0.2}
         >
           <CuboidCollider
-            args={[3.9, 1.6, 0.15]}
+            args={[2.8, 2.5, 0.2]}
             sensor={!isCountdown}
             friction={0}
-            restitution={0.2}
+            restitution={0}
           />
           {isCountdown && (
-            <group>
-              {/* Cristal de energía */}
-              <mesh castShadow receiveShadow>
-                <boxGeometry args={[7.8, 3.2, 0.3]} />
-                <meshStandardMaterial
-                  color="#38bdf8"
-                  transparent
-                  opacity={0.2}
-                  roughness={0.1}
-                  metalness={0.8}
-                  emissive="#0284c7"
-                  emissiveIntensity={0.3}
-                />
-              </mesh>
-              {/* Barra superior brillante */}
-              <mesh position={[0, 1.6, 0]}>
-                <boxGeometry args={[7.85, 0.12, 0.35]} />
-                <meshStandardMaterial
-                  color="#38bdf8"
-                  emissive="#38bdf8"
-                  emissiveIntensity={1.5}
-                  roughness={0.2}
-                />
-              </mesh>
-            </group>
+            <mesh>
+              <boxGeometry args={[5.6, 5.0, 0.1]} />
+              <meshStandardMaterial
+                color="#00f0ff"
+                transparent
+                opacity={0.25}
+                emissive="#00f0ff"
+                emissiveIntensity={0.5}
+                depthWrite={false}
+              />
+            </mesh>
           )}
         </RigidBody>
       ))}

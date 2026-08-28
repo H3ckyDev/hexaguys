@@ -9,6 +9,7 @@ import { GameUI } from "./components/GameUI";
 import { LandingPage } from "./components/LandingPage";
 import { PerformanceHUD } from "./components/PerformanceHUD";
 import { ChatOverlay } from "./components/ChatOverlay";
+import { MobileControlsHUD } from "./components/MobileControlsHUD";
 import { playStepSound } from "./utils/sounds";
 
 import { useDeviceDetection } from "./hooks/useDeviceDetection";
@@ -145,11 +146,15 @@ function App() {
 
         <PerformanceHUD showFps={showFps} />
 
-        <ChatOverlay
-          messages={chatMessages}
-          onSendMessage={handleSendMessage}
-          localPlayerId={localPlayer?.id}
-        />
+        <MobileControlsHUD visible={Boolean(isMobile && connected && !showSettings)} />
+
+        {(gameStatus === "LOBBY" || gameStatus === "ROUND_OVER") && (
+          <ChatOverlay
+            messages={chatMessages}
+            onSendMessage={handleSendMessage}
+            localPlayerId={localPlayer?.id}
+          />
+        )}
 
         <GameUI
           players={players}

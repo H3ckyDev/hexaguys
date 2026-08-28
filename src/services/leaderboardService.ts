@@ -8,9 +8,9 @@ import {
   increment,
   query,
   orderBy,
-  limit
+  limit,
 } from "firebase/firestore";
-import { db, isFirebaseConfigured } from "./firebase";
+import { db, auth, isFirebaseConfigured } from "./firebase";
 
 export type LeaderboardMetric = "score" | "matches";
 export type LeaderboardPeriod = "weekly" | "monthly" | "allTime";
@@ -47,48 +47,11 @@ export function getMonthKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-const LOCAL_STORAGE_KEY = "hexaguys_leaderboard_data";
-const PLAYER_ID_STORAGE_KEY = "hexaguys_player_uuid";
-
 export function getPersistentPlayerId(): string {
-  try {
-    let id = localStorage.getItem(PLAYER_ID_STORAGE_KEY);
-    if (!id) {
-      const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9) + "_" + Date.now().toString(36);
-      id = "p_" + randomPart;
-      localStorage.setItem(PLAYER_ID_STORAGE_KEY, id);
-    }
-    return id;
-  } catch {
-    const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
-    return "p_guest_" + randomPart;
+  if (auth?.currentUser?.uid) {
+    return auth.currentUser.uid;
   }
-}
-
-function getLocalPlayers(): LeaderboardPlayer[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed: LeaderboardPlayer[] = JSON.parse(raw);
-    // Filtrar posibles datos quemados previos de demo
-    const realPlayers = parsed.filter((p) => !p.playerId.startsWith("demo_"));
-    if (realPlayers.length !== parsed.length) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(realPlayers));
-    }
-    return realPlayers;
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalPlayers(players: LeaderboardPlayer[]) {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(players));
-  } catch (e) {
-    console.error("[Leaderboard] Failed to save to localStorage", e);
-  }
+  return "guest_" + (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Date.now().toString(36));
 }
 
 export interface MatchResultPayload {
@@ -101,134 +64,103 @@ export interface MatchResultPayload {
   isWin: boolean;
 }
 
+/**
+ * Registra resultados de partida exclusivamente en Firebase Firestore
+ * Los usuarios invitados (sin login) NO guardan progreso en la BD ni en localStorage.
+ */
 export async function recordMatchResult(payload: MatchResultPayload): Promise<void> {
+  const currentUserId = auth?.currentUser?.uid;
+  // Solo los usuarios logueados guardan estadísticas en Firestore
+  if (!currentUserId || !isFirebaseConfigured || !db) {
+    return;
+  }
+
   const currentWeek = getWeekKey();
   const currentMonth = getMonthKey();
   const now = Date.now();
 
-  // 1. Registro en Firebase Firestore (si está configurado)
-  if (isFirebaseConfigured && db) {
-    try {
-      const docRef = doc(db, "leaderboard_players", payload.playerId);
-      const docSnap = await getDoc(docRef);
+  try {
+    const docRef = doc(db, "leaderboard_players", currentUserId);
+    const userDocRef = doc(db, "users", currentUserId);
+    const docSnap = await getDoc(docRef);
 
-      if (docSnap.exists()) {
-        const prev = docSnap.data() as LeaderboardPlayer;
-        const isNewWeek = prev.lastWeekKey !== currentWeek;
-        const isNewMonth = prev.lastMonthKey !== currentMonth;
+    if (docSnap.exists()) {
+      const prev = docSnap.data() as LeaderboardPlayer;
+      const isNewWeek = prev.lastWeekKey !== currentWeek;
+      const isNewMonth = prev.lastMonthKey !== currentMonth;
 
-        const updateData: any = {
-          nickname: payload.nickname || prev.nickname,
-          skin: payload.skin || prev.skin,
-          avatar: payload.avatar || prev.avatar,
-          color: payload.color || prev.color,
-          allTimeScore: increment(payload.scoreGained),
-          allTimeMatches: increment(1),
-          allTimeWins: increment(payload.isWin ? 1 : 0),
-          lastWeekKey: currentWeek,
-          lastMonthKey: currentMonth,
-          updatedAt: now,
-        };
+      const updateData: Record<string, unknown> = {
+        nickname: payload.nickname || prev.nickname,
+        skin: payload.skin || prev.skin,
+        avatar: payload.avatar || prev.avatar,
+        color: payload.color || prev.color,
+        allTimeScore: increment(payload.scoreGained),
+        allTimeMatches: increment(1),
+        allTimeWins: increment(payload.isWin ? 1 : 0),
+        lastWeekKey: currentWeek,
+        lastMonthKey: currentMonth,
+        updatedAt: now,
+      };
 
-        if (isNewWeek) {
-          updateData.weeklyScore = payload.scoreGained;
-          updateData.weeklyMatches = 1;
-          updateData.weeklyWins = payload.isWin ? 1 : 0;
-        } else {
-          updateData.weeklyScore = increment(payload.scoreGained);
-          updateData.weeklyMatches = increment(1);
-          updateData.weeklyWins = increment(payload.isWin ? 1 : 0);
-        }
-
-        if (isNewMonth) {
-          updateData.monthlyScore = payload.scoreGained;
-          updateData.monthlyMatches = 1;
-          updateData.monthlyWins = payload.isWin ? 1 : 0;
-        } else {
-          updateData.monthlyScore = increment(payload.scoreGained);
-          updateData.monthlyMatches = increment(1);
-          updateData.monthlyWins = increment(payload.isWin ? 1 : 0);
-        }
-
-        await updateDoc(docRef, updateData);
+      if (isNewWeek) {
+        updateData.weeklyScore = payload.scoreGained;
+        updateData.weeklyMatches = 1;
+        updateData.weeklyWins = payload.isWin ? 1 : 0;
       } else {
-        const data: LeaderboardPlayer = {
-          playerId: payload.playerId,
-          nickname: payload.nickname || "Jugador",
-          skin: payload.skin || "robot",
-          avatar: payload.avatar,
-          color: payload.color || "#38bdf8",
-          allTimeScore: payload.scoreGained,
-          allTimeMatches: 1,
-          allTimeWins: payload.isWin ? 1 : 0,
-          weeklyScore: payload.scoreGained,
-          weeklyMatches: 1,
-          weeklyWins: payload.isWin ? 1 : 0,
-          monthlyScore: payload.scoreGained,
-          monthlyMatches: 1,
-          monthlyWins: payload.isWin ? 1 : 0,
-          lastWeekKey: currentWeek,
-          lastMonthKey: currentMonth,
-          updatedAt: now,
-        };
-        await setDoc(docRef, data);
+        updateData.weeklyScore = increment(payload.scoreGained);
+        updateData.weeklyMatches = increment(1);
+        updateData.weeklyWins = increment(payload.isWin ? 1 : 0);
       }
-    } catch (error) {
-      console.warn("[Leaderboard] Error saving match to Firebase, using local fallback:", error);
+
+      if (isNewMonth) {
+        updateData.monthlyScore = payload.scoreGained;
+        updateData.monthlyMatches = 1;
+        updateData.monthlyWins = payload.isWin ? 1 : 0;
+      } else {
+        updateData.monthlyScore = increment(payload.scoreGained);
+        updateData.monthlyMatches = increment(1);
+        updateData.monthlyWins = increment(payload.isWin ? 1 : 0);
+      }
+
+      await updateDoc(docRef, updateData);
+    } else {
+      const data: LeaderboardPlayer = {
+        playerId: currentUserId,
+        nickname: payload.nickname || "Jugador",
+        skin: payload.skin || "robot",
+        avatar: payload.avatar,
+        color: payload.color || "#38bdf8",
+        allTimeScore: payload.scoreGained,
+        allTimeMatches: 1,
+        allTimeWins: payload.isWin ? 1 : 0,
+        weeklyScore: payload.scoreGained,
+        weeklyMatches: 1,
+        weeklyWins: payload.isWin ? 1 : 0,
+        monthlyScore: payload.scoreGained,
+        monthlyMatches: 1,
+        monthlyWins: payload.isWin ? 1 : 0,
+        lastWeekKey: currentWeek,
+        lastMonthKey: currentMonth,
+        updatedAt: now,
+      };
+
+      await setDoc(docRef, data, { merge: true });
     }
+
+    // Sincronizar también estadísticas agregadas en users/{uid}
+    await setDoc(
+      userDocRef,
+      {
+        allTimeScore: increment(payload.scoreGained),
+        allTimeMatches: increment(1),
+        allTimeWins: increment(payload.isWin ? 1 : 0),
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn("[Leaderboard] Error al guardar estadísticas en Firestore:", error);
   }
-
-  // 2. Registro espejo en LocalStorage
-  const localList = getLocalPlayers();
-  const index = localList.findIndex((p) => p.playerId === payload.playerId);
-
-  if (index >= 0) {
-    const prev = localList[index];
-    const isNewWeek = prev.lastWeekKey !== currentWeek;
-    const isNewMonth = prev.lastMonthKey !== currentMonth;
-
-    localList[index] = {
-      ...prev,
-      nickname: payload.nickname || prev.nickname,
-      skin: payload.skin || prev.skin,
-      avatar: payload.avatar || prev.avatar,
-      color: payload.color || prev.color,
-      allTimeScore: (prev.allTimeScore || 0) + payload.scoreGained,
-      allTimeMatches: (prev.allTimeMatches || 0) + 1,
-      allTimeWins: (prev.allTimeWins || 0) + (payload.isWin ? 1 : 0),
-      weeklyScore: (isNewWeek ? 0 : prev.weeklyScore || 0) + payload.scoreGained,
-      weeklyMatches: (isNewWeek ? 0 : prev.weeklyMatches || 0) + 1,
-      weeklyWins: (isNewWeek ? 0 : prev.weeklyWins || 0) + (payload.isWin ? 1 : 0),
-      monthlyScore: (isNewMonth ? 0 : prev.monthlyScore || 0) + payload.scoreGained,
-      monthlyMatches: (isNewMonth ? 0 : prev.monthlyMatches || 0) + 1,
-      monthlyWins: (isNewMonth ? 0 : prev.monthlyWins || 0) + (payload.isWin ? 1 : 0),
-      lastWeekKey: currentWeek,
-      lastMonthKey: currentMonth,
-      updatedAt: now,
-    };
-  } else {
-    localList.push({
-      playerId: payload.playerId,
-      nickname: payload.nickname || "Jugador",
-      skin: payload.skin || "robot",
-      avatar: payload.avatar,
-      color: payload.color || "#38bdf8",
-      allTimeScore: payload.scoreGained,
-      allTimeMatches: 1,
-      allTimeWins: payload.isWin ? 1 : 0,
-      weeklyScore: payload.scoreGained,
-      weeklyMatches: 1,
-      weeklyWins: payload.isWin ? 1 : 0,
-      monthlyScore: payload.scoreGained,
-      monthlyMatches: 1,
-      monthlyWins: payload.isWin ? 1 : 0,
-      lastWeekKey: currentWeek,
-      lastMonthKey: currentMonth,
-      updatedAt: now,
-    });
-  }
-
-  saveLocalPlayers(localList);
 }
 
 export function getFieldForQuery(metric: LeaderboardMetric, period: LeaderboardPeriod): keyof LeaderboardPlayer {
@@ -243,6 +175,9 @@ export function getFieldForQuery(metric: LeaderboardMetric, period: LeaderboardP
   }
 }
 
+/**
+ * Consulta la tabla de posiciones directamente desde Firestore
+ */
 export async function fetchLeaderboard(
   metric: LeaderboardMetric = "score",
   period: LeaderboardPeriod = "weekly"
@@ -271,40 +206,25 @@ export async function fetchLeaderboard(
           allTimeScore: item.allTimeScore || 0,
           allTimeMatches: item.allTimeMatches || 0,
           allTimeWins: item.allTimeWins || 0,
-          weeklyScore: item.lastWeekKey === currentWeek ? (item.weeklyScore || 0) : 0,
-          weeklyMatches: item.lastWeekKey === currentWeek ? (item.weeklyMatches || 0) : 0,
-          weeklyWins: item.lastWeekKey === currentWeek ? (item.weeklyWins || 0) : 0,
-          monthlyScore: item.lastMonthKey === currentMonth ? (item.monthlyScore || 0) : 0,
-          monthlyMatches: item.lastMonthKey === currentMonth ? (item.monthlyMatches || 0) : 0,
-          monthlyWins: item.lastMonthKey === currentMonth ? (item.monthlyWins || 0) : 0,
+          weeklyScore: item.lastWeekKey === currentWeek ? item.weeklyScore || 0 : 0,
+          weeklyMatches: item.lastWeekKey === currentWeek ? item.weeklyMatches || 0 : 0,
+          weeklyWins: item.lastWeekKey === currentWeek ? item.weeklyWins || 0 : 0,
+          monthlyScore: item.lastMonthKey === currentMonth ? item.monthlyScore || 0 : 0,
+          monthlyMatches: item.lastMonthKey === currentMonth ? item.monthlyMatches || 0 : 0,
+          monthlyWins: item.lastMonthKey === currentMonth ? item.monthlyWins || 0 : 0,
           lastWeekKey: item.lastWeekKey || currentWeek,
           lastMonthKey: item.lastMonthKey || currentMonth,
-          updatedAt: item.updatedAt || Date.now(),
+          updatedAt: item.updatedAt || 0,
         };
         results.push(playerItem);
       });
 
       return results;
-    } catch (error) {
-      console.warn("[Leaderboard] Error al consultar Firestore, usando datos locales:", error);
+    } catch (e) {
+      console.warn("[Leaderboard] Error al consultar Firestore:", e);
+      return [];
     }
   }
 
-  // Fallback local
-  const list = getLocalPlayers().map((item) => {
-    const cloned = { ...item };
-    if (cloned.lastWeekKey !== currentWeek) {
-      cloned.weeklyScore = 0;
-      cloned.weeklyMatches = 0;
-      cloned.weeklyWins = 0;
-    }
-    if (cloned.lastMonthKey !== currentMonth) {
-      cloned.monthlyScore = 0;
-      cloned.monthlyMatches = 0;
-      cloned.monthlyWins = 0;
-    }
-    return cloned;
-  });
-
-  return list.sort((a, b) => Number(b[sortField] || 0) - Number(a[sortField] || 0)).slice(0, 50);
+  return [];
 }

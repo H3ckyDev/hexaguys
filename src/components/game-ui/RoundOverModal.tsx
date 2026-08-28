@@ -20,7 +20,7 @@ export const RoundOverModal = memo(function RoundOverModal({
   onExitGame,
 }: RoundOverModalProps) {
   return (
-    <div className="stealth-panel max-w-sm w-full p-6 sm:p-7 flex flex-col items-center gap-4 text-center text-slate-100 animate-in zoom-in-95 duration-150">
+    <div className="stealth-panel max-w-sm w-full p-6 sm:p-7 flex flex-col items-center gap-4 text-center text-slate-100 animate-in zoom-in-95 duration-150 pointer-events-auto">
       <div className="w-12 h-12 bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(255,208,0,0.4)]">
         <CrownIcon className="w-6 h-6" />
       </div>

@@ -275,7 +275,7 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
                 {/* 🥇 Primer Lugar */}
                 {top1 && (
                   <div className={`flex flex-col items-center p-4 bg-[#101422] border-2 border-amber-400 shadow-[0_0_25px_rgba(255,208,0,0.25)] relative ${players.length >= 3 ? "order-2 scale-105" : "order-1"} z-10`}>
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex items-center justify-center">
+                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center justify-center">
                       <CrownIcon className="w-6 h-6 text-amber-400 animate-bounce" />
                     </div>
                     <div className="w-14 h-14 flex items-center justify-center mb-1 mt-1">

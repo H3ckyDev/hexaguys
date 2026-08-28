@@ -7,9 +7,12 @@ interface CharacterModelProps {
   type: "robot" | "ninja" | "astronaut" | "alien";
   avatar?: AvatarConfig | string | null;
   color: string;
-  isMoving: boolean;
-  isGrounded: boolean;
+  isMoving?: boolean;
+  isGrounded?: boolean;
   isRunning?: boolean;
+  isMovingRef?: React.MutableRefObject<boolean>;
+  isGroundedRef?: React.MutableRefObject<boolean>;
+  isRunningRef?: React.MutableRefObject<boolean>;
 }
 
 export function CharacterModel({
@@ -19,6 +22,9 @@ export function CharacterModel({
   isMoving,
   isGrounded,
   isRunning = false,
+  isMovingRef,
+  isGroundedRef,
+  isRunningRef,
 }: CharacterModelProps) {
   const avatarConfig = typeof avatar === "object" && avatar !== null
     ? avatar
@@ -33,14 +39,20 @@ export function CharacterModel({
   const headRef = useRef<THREE.Group>(null);
 
   const animTime = useRef(0);
+  const idleTime = useRef(0);
 
   useFrame((_, delta) => {
-    // 1. Walking vs Running animation
-    if (isMoving && isGrounded) {
-      const speedMultiplier = isRunning ? 14.0 : 7.5;
+    // Lectura en tiempo real directo del ref sin depender del ciclo de re-renderizado de React
+    const moving = isMovingRef ? isMovingRef.current : Boolean(isMoving);
+    const grounded = isGroundedRef ? isGroundedRef.current : (isGrounded !== undefined ? isGrounded : true);
+    const running = isRunningRef ? isRunningRef.current : Boolean(isRunning);
+
+    // 1. Animación de Caminata y Carrera
+    if (moving && grounded) {
+      const speedMultiplier = running ? 14.0 : 8.0;
       animTime.current += delta * speedMultiplier;
       
-      const swingAmp = isRunning ? 0.75 : 0.45;
+      const swingAmp = running ? 0.75 : 0.45;
       const swing = Math.sin(animTime.current) * swingAmp;
       
       if (leftLegRef.current) leftLegRef.current.rotation.x = swing;
@@ -48,43 +60,49 @@ export function CharacterModel({
       if (leftArmRef.current) leftArmRef.current.rotation.x = -swing;
       if (rightArmRef.current) rightArmRef.current.rotation.x = swing;
 
-      // Bounce & Sprint forward lean
+      // Rebote y pequeña inclinación al correr
       if (bodyRef.current) {
-        const bounceAmp = isRunning ? 0.12 : 0.05;
+        const bounceAmp = running ? 0.12 : 0.05;
         bodyRef.current.position.y = Math.abs(Math.sin(animTime.current * 2)) * bounceAmp;
         
-        // Lean forward into sprint
-        const targetPitch = isRunning ? -0.2 : 0;
+        const targetPitch = running ? -0.2 : 0;
         bodyRef.current.rotation.x = THREE.MathUtils.lerp(bodyRef.current.rotation.x, targetPitch, delta * 10);
       }
-    } else {
-      // Return slowly to idle
+
+      if (leftLegRef.current) leftLegRef.current.rotation.z = THREE.MathUtils.lerp(leftLegRef.current.rotation.z, 0, delta * 8);
+      if (rightLegRef.current) rightLegRef.current.rotation.z = THREE.MathUtils.lerp(rightLegRef.current.rotation.z, 0, delta * 8);
+    } else if (grounded) {
+      // 2. Animación Idle en Reposo (Respiración y balanceo sutil)
+      idleTime.current += delta * 2.2;
       animTime.current = 0;
       const lerpSpeed = delta * 10;
       
+      const breath = Math.sin(idleTime.current) * 0.02;
+      const armIdle = Math.sin(idleTime.current * 0.8) * 0.04;
+
       if (leftLegRef.current) leftLegRef.current.rotation.x = THREE.MathUtils.lerp(leftLegRef.current.rotation.x, 0, lerpSpeed);
       if (rightLegRef.current) rightLegRef.current.rotation.x = THREE.MathUtils.lerp(rightLegRef.current.rotation.x, 0, lerpSpeed);
-      if (leftArmRef.current) leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, 0, lerpSpeed);
-      if (rightArmRef.current) rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, lerpSpeed);
+      if (leftArmRef.current) leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, armIdle, lerpSpeed);
+      if (rightArmRef.current) rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, -armIdle, lerpSpeed);
+      
       if (bodyRef.current) {
-        bodyRef.current.position.y = THREE.MathUtils.lerp(bodyRef.current.position.y, 0, lerpSpeed);
+        bodyRef.current.position.y = THREE.MathUtils.lerp(bodyRef.current.position.y, breath, lerpSpeed);
         bodyRef.current.rotation.x = THREE.MathUtils.lerp(bodyRef.current.rotation.x, 0, lerpSpeed);
       }
-    }
 
-    // 2. Jumping pose
-    if (!isGrounded) {
-      const lerpSpeed = delta * 8;
-      // Lift arms up in panic/joy
-      if (leftArmRef.current) leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, -Math.PI * 0.8, lerpSpeed);
-      if (rightArmRef.current) rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, -Math.PI * 0.8, lerpSpeed);
-      // Legs separate slightly
-      if (leftLegRef.current) leftLegRef.current.rotation.z = THREE.MathUtils.lerp(leftLegRef.current.rotation.z, -0.15, lerpSpeed);
-      if (rightLegRef.current) rightLegRef.current.rotation.z = THREE.MathUtils.lerp(rightLegRef.current.rotation.z, 0.15, lerpSpeed);
-    } else {
-      const lerpSpeed = delta * 8;
+      if (headRef.current) {
+        headRef.current.rotation.y = Math.sin(idleTime.current * 0.5) * 0.05;
+      }
+
       if (leftLegRef.current) leftLegRef.current.rotation.z = THREE.MathUtils.lerp(leftLegRef.current.rotation.z, 0, lerpSpeed);
       if (rightLegRef.current) rightLegRef.current.rotation.z = THREE.MathUtils.lerp(rightLegRef.current.rotation.z, 0, lerpSpeed);
+    } else {
+      // 3. Postura en el aire / Salto
+      const lerpSpeed = delta * 8;
+      if (leftArmRef.current) leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, -Math.PI * 0.8, lerpSpeed);
+      if (rightArmRef.current) rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, -Math.PI * 0.8, lerpSpeed);
+      if (leftLegRef.current) leftLegRef.current.rotation.z = THREE.MathUtils.lerp(leftLegRef.current.rotation.z, -0.15, lerpSpeed);
+      if (rightLegRef.current) rightLegRef.current.rotation.z = THREE.MathUtils.lerp(rightLegRef.current.rotation.z, 0.15, lerpSpeed);
     }
   });
 
@@ -98,174 +116,147 @@ export function CharacterModel({
   );
 
   return (
-    <group ref={bodyRef} position={[0, -0.4, 0]}>
-      {/* 1. MAIN BODY COB */}
-      <mesh castShadow receiveShadow position={[0, 0.6, 0]}>
-        <boxGeometry args={[0.55, 0.55, 0.35]} />
-        {mainMaterial}
-      </mesh>
-
-      {/* Backpack for Astronaut */}
-      {type === "astronaut" && (
-        <mesh castShadow position={[0, 0.6, -0.22]}>
-          <boxGeometry args={[0.35, 0.4, 0.15]} />
-          <meshStandardMaterial color="#e2e8f0" roughness={0.3} />
-        </mesh>
-      )}
-
-      {/* Ninja belt */}
-      {type === "ninja" && (
-        <mesh castShadow position={[0, 0.45, 0]}>
-          <boxGeometry args={[0.57, 0.08, 0.37]} />
-          <meshStandardMaterial color="#ef4444" roughness={0.6} />
-        </mesh>
-      )}
-
-      {/* Robot screen chest */}
-      {type === "robot" && (
-        <mesh castShadow position={[0, 0.6, 0.185]}>
-          <boxGeometry args={[0.3, 0.2, 0.02]} />
-          <meshStandardMaterial color="#0284c7" emissive="#0284c7" emissiveIntensity={0.6} />
-        </mesh>
-      )}
-
-      {/* 2. HEAD */}
-      <group ref={headRef} position={[0, 1.05, 0]}>
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[0.42, 0.42, 0.42]} />
+    <group position={[0, 0, 0]}>
+      {/* CUERPO CENTRAL */}
+      <group ref={bodyRef} position={[0, 0, 0]}>
+        <mesh position={[0, 0.35, 0]} castShadow>
+          <boxGeometry args={[0.42, 0.45, 0.28]} />
           {mainMaterial}
         </mesh>
 
-        {/* Visor / Ojos LED dinámicos según AvatarConfig */}
-        {avatarConfig ? (
-          <>
-            {/* Ojos / Visor LED frontal */}
-            <mesh position={[0, 0.06, 0.22]}>
-              <boxGeometry args={[0.3, 0.08, 0.02]} />
-              <meshStandardMaterial
-                color={avatarConfig.eyes === 0 ? "#06b6d4" : avatarConfig.eyes === 1 ? "#10b981" : avatarConfig.eyes === 2 ? "#3b82f6" : avatarConfig.eyes === 3 ? "#ef4444" : avatarConfig.eyes === 4 ? "#f59e0b" : avatarConfig.eyes === 5 ? "#06b6d4" : avatarConfig.eyes === 6 ? "#ec4899" : "#a855f7"}
-                emissive={avatarConfig.eyes === 0 ? "#06b6d4" : avatarConfig.eyes === 1 ? "#10b981" : avatarConfig.eyes === 2 ? "#3b82f6" : avatarConfig.eyes === 3 ? "#ef4444" : avatarConfig.eyes === 4 ? "#f59e0b" : avatarConfig.eyes === 5 ? "#06b6d4" : avatarConfig.eyes === 6 ? "#ec4899" : "#a855f7"}
-                emissiveIntensity={1.2}
-              />
-            </mesh>
+        {/* Franja o núcleo en el pecho */}
+        <mesh position={[0, 0.38, 0.142]}>
+          <planeGeometry args={[0.22, 0.16]} />
+          <meshStandardMaterial
+            color={avatarConfig.color || color}
+            emissive={avatarConfig.color || color}
+            emissiveIntensity={0.6}
+            roughness={0.2}
+          />
+        </mesh>
 
-            {/* Accesorio 3D 1: Antenas Dobles */}
-            {avatarConfig.accessory === 1 && (
-              <>
-                <mesh position={[-0.12, 0.28, 0]}>
-                  <cylinderGeometry args={[0.015, 0.015, 0.16]} />
-                  <meshStandardMaterial color="#64748b" metalness={0.9} />
-                </mesh>
-                <mesh position={[-0.12, 0.36, 0]}>
-                  <sphereGeometry args={[0.03, 8, 8]} />
-                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={1} />
-                </mesh>
-                <mesh position={[0.12, 0.28, 0]}>
-                  <cylinderGeometry args={[0.015, 0.015, 0.16]} />
-                  <meshStandardMaterial color="#64748b" metalness={0.9} />
-                </mesh>
-                <mesh position={[0.12, 0.36, 0]}>
-                  <sphereGeometry args={[0.03, 8, 8]} />
-                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={1} />
-                </mesh>
-              </>
-            )}
+        {/* CABEZA */}
+        <group ref={headRef} position={[0, 0.72, 0]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.38, 0.36, 0.36]} />
+            {mainMaterial}
+          </mesh>
 
-            {/* Accesorio 3D 2: Cuernos Cibernéticos */}
-            {avatarConfig.accessory === 2 && (
-              <>
-                <mesh position={[-0.18, 0.24, 0]} rotation={[0, 0, 0.4]}>
-                  <coneGeometry args={[0.05, 0.15, 8]} />
-                  <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.8} />
-                </mesh>
-                <mesh position={[0.18, 0.24, 0]} rotation={[0, 0, -0.4]}>
-                  <coneGeometry args={[0.05, 0.15, 8]} />
-                  <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.8} />
-                </mesh>
-              </>
-            )}
+          {/* VISOR / OJOS LED */}
+          <mesh position={[0, 0.02, 0.182]}>
+            <planeGeometry args={[0.28, 0.14]} />
+            <meshStandardMaterial
+              color="#00f0ff"
+              emissive="#00f0ff"
+              emissiveIntensity={1.5}
+              roughness={0.1}
+            />
+          </mesh>
 
-            {/* Accesorio 3D 3: Auriculares Gamer */}
-            {avatarConfig.accessory === 3 && (
-              <>
-                {/* Diadema */}
-                <mesh position={[0, 0.22, 0]}>
-                  <boxGeometry args={[0.48, 0.04, 0.08]} />
-                  <meshStandardMaterial color="#0f172a" metalness={0.8} />
-                </mesh>
-                {/* Orejeras */}
-                <mesh position={[-0.23, 0.04, 0]}>
-                  <cylinderGeometry args={[0.08, 0.08, 0.05]} />
-                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.8} />
-                </mesh>
-                <mesh position={[0.23, 0.04, 0]}>
-                  <cylinderGeometry args={[0.08, 0.08, 0.05]} />
-                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.8} />
-                </mesh>
-              </>
-            )}
-
-            {/* Accesorio 3D 4: Tornillos Laterales */}
-            {avatarConfig.accessory === 4 && (
-              <>
-                <mesh position={[-0.23, 0.04, 0]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.04, 0.04, 0.06]} />
-                  <meshStandardMaterial color="#94a3b8" metalness={0.9} />
-                </mesh>
-                <mesh position={[0.23, 0.04, 0]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.04, 0.04, 0.06]} />
-                  <meshStandardMaterial color="#94a3b8" metalness={0.9} />
-                </mesh>
-              </>
-            )}
-
-            {/* Accesorio 3D 5: Aleta Superior */}
-            {avatarConfig.accessory === 5 && (
-              <mesh position={[0, 0.28, 0]}>
-                <boxGeometry args={[0.04, 0.14, 0.3]} />
-                <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.8} />
+          {/* CASCO / BASE ADICIONAL SEGÚN AVATAR */}
+          {avatarConfig.head === 1 && (
+            // Cuernos mecha
+            <group position={[0, 0.22, 0]}>
+              <mesh position={[-0.18, 0.08, 0]} rotation={[0, 0, 0.4]}>
+                <boxGeometry args={[0.06, 0.18, 0.06]} />
+                <meshStandardMaterial color={color} metalness={0.8} />
               </mesh>
-            )}
-          </>
-        ) : (
-          /* Fallback por tipo */
-          type === "robot" ? (
-            <mesh position={[0, 0.08, 0.22]}>
-              <boxGeometry args={[0.3, 0.08, 0.02]} />
-              <meshStandardMaterial color="#ec4899" emissive="#ec4899" emissiveIntensity={1} />
+              <mesh position={[0.18, 0.08, 0]} rotation={[0, 0, -0.4]}>
+                <boxGeometry args={[0.06, 0.18, 0.06]} />
+                <meshStandardMaterial color={color} metalness={0.8} />
+              </mesh>
+            </group>
+          )}
+
+          {avatarConfig.head === 2 && (
+            // Corona Cyber
+            <mesh position={[0, 0.22, 0]}>
+              <cylinderGeometry args={[0.18, 0.18, 0.08, 6]} />
+              <meshStandardMaterial color="#ffd000" metalness={0.9} roughness={0.2} />
             </mesh>
-          ) : null
-        )}
+          )}
+
+          {avatarConfig.head === 3 && (
+            // Casco Cyber Samurai / Ninja
+            <mesh position={[0, 0.22, 0]}>
+              <boxGeometry args={[0.42, 0.08, 0.42]} />
+              <meshStandardMaterial color="#0f172a" roughness={0.5} />
+            </mesh>
+          )}
+
+          {avatarConfig.head === 4 && (
+            // Cresta Mohicano Neón
+            <mesh position={[0, 0.24, 0]}>
+              <boxGeometry args={[0.06, 0.14, 0.36]} />
+              <meshStandardMaterial color="#ec4899" emissive="#ec4899" emissiveIntensity={0.8} />
+            </mesh>
+          )}
+
+          {/* ACCESORIO / ANTENAS */}
+          {avatarConfig.accessory === 1 && (
+            <mesh position={[0.2, 0.15, 0]}>
+              <cylinderGeometry args={[0.02, 0.02, 0.22]} />
+              <meshStandardMaterial color="#ffd000" metalness={0.8} />
+            </mesh>
+          )}
+          {avatarConfig.accessory === 2 && (
+            // Auriculares DJ Neón
+            <group position={[0, 0, 0]}>
+              <mesh position={[-0.21, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.08, 0.08, 0.06, 12]} />
+                <meshStandardMaterial color="#00f0ff" emissive="#00f0ff" emissiveIntensity={0.8} />
+              </mesh>
+              <mesh position={[0.21, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.08, 0.08, 0.06, 12]} />
+                <meshStandardMaterial color="#00f0ff" emissive="#00f0ff" emissiveIntensity={0.8} />
+              </mesh>
+            </group>
+          )}
+          {avatarConfig.accessory === 3 && (
+            // Halo Holográfico
+            <mesh position={[0, 0.32, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.22, 0.02, 8, 24]} />
+              <meshStandardMaterial color="#00f0ff" emissive="#00f0ff" emissiveIntensity={1.8} transparent opacity={0.85} />
+            </mesh>
+          )}
+          {avatarConfig.accessory === 4 && (
+            // Monóculo Táctico
+            <mesh position={[0.08, 0.03, 0.19]}>
+              <circleGeometry args={[0.06, 12]} />
+              <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={1.5} />
+            </mesh>
+          )}
+        </group>
+
+        {/* BRAZO IZQUIERDO */}
+        <group ref={leftArmRef} position={[-0.28, 0.48, 0]}>
+          <mesh position={[0, -0.18, 0]} castShadow>
+            <boxGeometry args={[0.12, 0.36, 0.12]} />
+            {mainMaterial}
+          </mesh>
+        </group>
+
+        {/* BRAZO DERECHO */}
+        <group ref={rightArmRef} position={[0.28, 0.48, 0]}>
+          <mesh position={[0, -0.18, 0]} castShadow>
+            <boxGeometry args={[0.12, 0.36, 0.12]} />
+            {mainMaterial}
+          </mesh>
+        </group>
       </group>
 
-      {/* 3. LEFT ARM */}
-      <group ref={leftArmRef} position={[-0.38, 0.8, 0]}>
-        <mesh castShadow position={[0, -0.2, 0]}>
-          <boxGeometry args={[0.15, 0.38, 0.15]} />
+      {/* PIERNA IZQUIERDA */}
+      <group ref={leftLegRef} position={[-0.12, 0.18, 0]}>
+        <mesh position={[0, -0.16, 0]} castShadow>
+          <boxGeometry args={[0.14, 0.32, 0.14]} />
           {mainMaterial}
         </mesh>
       </group>
 
-      {/* 4. RIGHT ARM */}
-      <group ref={rightArmRef} position={[0.38, 0.8, 0]}>
-        <mesh castShadow position={[0, -0.2, 0]}>
-          <boxGeometry args={[0.15, 0.38, 0.15]} />
-          {mainMaterial}
-        </mesh>
-      </group>
-
-      {/* 5. LEFT LEG */}
-      <group ref={leftLegRef} position={[-0.16, 0.35, 0]}>
-        <mesh castShadow position={[0, -0.2, 0]}>
-          <boxGeometry args={[0.18, 0.38, 0.18]} />
-          {mainMaterial}
-        </mesh>
-      </group>
-
-      {/* 6. RIGHT LEG */}
-      <group ref={rightLegRef} position={[0.16, 0.35, 0]}>
-        <mesh castShadow position={[0, -0.2, 0]}>
-          <boxGeometry args={[0.18, 0.38, 0.18]} />
+      {/* PIERNA DERECHA */}
+      <group ref={rightLegRef} position={[0.12, 0.18, 0]}>
+        <mesh position={[0, -0.16, 0]} castShadow>
+          <boxGeometry args={[0.14, 0.32, 0.14]} />
           {mainMaterial}
         </mesh>
       </group>
