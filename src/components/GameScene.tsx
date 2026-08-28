@@ -58,8 +58,8 @@ export function GameScene({
 
         {/* Físicas del mundo 3D */}
         <Physics gravity={[0, -20, 0]}>
-          {/* 1. Sala de Espera: Caja de Cartón 3D (Ubicada en X=60, separada de la torre) */}
-          <CardboardBoxLobby position={[60, 0, 0]} />
+          {/* 1. Sala de Espera: Caja de Cartón 3D (Ubicada en X=60, se desactiva durante la partida) */}
+          <CardboardBoxLobby position={[60, 0, 0]} gameStatus={gameStatus} />
 
           {/* 2. Torres de Juego Hexagonales (Ubicadas en X=0, Y=0) */}
           <HexGrid
@@ -80,14 +80,19 @@ export function GameScene({
               isLocal={Boolean(localPlayer && p.id === localPlayer.id)}
               gameStatus={gameStatus}
               floorsCount={floorsCount}
+              mapId={mapId}
               isMobile={isMobile}
+              onStepTile={onStepTile}
             />
           ))}
         </Physics>
 
-        {/* Rejillas visuales de referencia en la base */}
-        <gridHelper args={[60, 60, "#1e293b", "#0f172a"]} position={[0, -8, 0]} />
-        <gridHelper args={[30, 30, "#27272a", "#18181b"]} position={[60, -0.2, 0]} />
+        {/* Rejillas visuales de referencia en la base optimizadas */}
+        {gameStatus !== "LOBBY" && gameStatus !== "ROUND_OVER" ? (
+          <gridHelper args={[60, 60, "#1e293b", "#0f172a"]} position={[0, -8, 0]} />
+        ) : (
+          <gridHelper args={[30, 30, "#27272a", "#18181b"]} position={[60, -0.2, 0]} />
+        )}
       </Canvas>
     </div>
   );

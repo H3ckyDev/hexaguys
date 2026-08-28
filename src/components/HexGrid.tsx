@@ -1,12 +1,43 @@
-import { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { RigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
-import { myPlayer } from "playroomkit";
-import * as THREE from "three";
 import { playBreakSound } from "../utils/sounds";
 
 export const HEX_RADIUS = 1.0;
-const STEP_DELAY = 500; // 0.5 seconds delay before tile falls
+const STEP_DELAY = 850; // 0.85 segundos de tiempo de reacción equilibrado antes de la caída
+
+/**
+ * Convierte coordenadas 3D de mundo (X, Z) a coordenadas hexagonales axiales (Q, R)
+ * con redondeo cúbico fraccional exacto
+ */
+export function worldToHex(x: number, z: number, hexRadius = HEX_RADIUS) {
+  const q_frac = (Math.sqrt(3) / 3 * x - 1 / 3 * z) / hexRadius;
+  const r_frac = (2 / 3 * z) / hexRadius;
+  const s_frac = -q_frac - r_frac;
+
+  let q = Math.round(q_frac);
+  let r = Math.round(r_frac);
+  let s = Math.round(s_frac);
+
+  const q_diff = Math.abs(q - q_frac);
+  const r_diff = Math.abs(r - r_frac);
+  const s_diff = Math.abs(s - s_frac);
+
+  if (q_diff > r_diff && q_diff > s_diff) {
+    q = -r - s;
+  } else if (r_diff > s_diff) {
+    r = -q - s;
+  }
+  return { q, r };
+}
+
+/**
+ * Comprueba si una coordenada hexagonal axial (Q, R) pertenece al tablero
+ */
+export function isHexInGrid(q: number, r: number, mapId = "classic") {
+  const rad = mapId === "tower" ? 3 : 4;
+  return Math.abs(q) <= rad && Math.abs(r) <= rad && Math.abs(-q - r) <= rad;
+}
 
 interface HexTileProps {
   id: string;
@@ -17,11 +48,10 @@ interface HexTileProps {
   gameStatus?: string;
 }
 
-function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTileProps) {
+function HexTileComponent({ id, position, floor, steppedAt, onStep, gameStatus }: HexTileProps) {
   const [isBroken, setIsBroken] = useState(false);
   const [scaleY, setScaleY] = useState(1);
   const [posY, setPosY] = useState(position[1]);
-  const matRef = useRef<THREE.MeshStandardMaterial>(null);
 
   useEffect(() => {
     if (steppedAt === null) {
@@ -46,34 +76,21 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
     }
   }, [steppedAt, position]);
 
-  // Animation for falling and shrinking when broken, plus dynamic upper-floor opacity
+  // Animación optimizada: solo corre para baldosas activas (pisadas o cayendo)
   useFrame((_, delta) => {
+    if (steppedAt === null && !isBroken) return;
+
     if (steppedAt !== null && !isBroken) {
-      // Blinking scale/vibration before breaking
       const elapsed = Date.now() - steppedAt;
-      const wave = Math.sin(elapsed * 0.05) * 0.08;
-      setScaleY(1 - (elapsed / STEP_DELAY) * 0.3 + wave);
+      const progress = Math.min(1, elapsed / STEP_DELAY);
+      const wave = Math.sin(elapsed * 0.04) * (0.02 + progress * 0.06);
+      setScaleY(1 - progress * 0.22 + wave);
     }
 
     if (isBroken && posY > -20) {
-      // Fall down
+      // Caída al vacío
       setPosY((prev) => prev - delta * 15);
       setScaleY((prev) => Math.max(0, prev - delta * 2));
-    }
-
-    // Dynamic upper-floor transparency: fade tiles above the local player so character is never obscured
-    if (matRef.current) {
-      const localPos = myPlayer()?.getState("pos");
-      if (localPos) {
-        const isAbovePlayer = localPos.y < position[1] - 1.2;
-        const targetOpacity = isAbovePlayer ? 0.2 : 1.0;
-        
-        if (Math.abs(matRef.current.opacity - targetOpacity) > 0.01) {
-          matRef.current.transparent = isAbovePlayer;
-          matRef.current.opacity = THREE.MathUtils.lerp(matRef.current.opacity, targetOpacity, delta * 12);
-          matRef.current.needsUpdate = true;
-        }
-      }
     }
   });
 
@@ -96,10 +113,15 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
   let color = FLOOR_COLORS[floor % FLOOR_COLORS.length];
 
   if (steppedAt !== null) {
-    // Alert state: Amber/Red blink
     const elapsed = Date.now() - steppedAt;
-    const isBlink = Math.floor(elapsed / 100) % 2 === 0;
-    color = isBlink ? "#f43f5e" : "#e11d48"; // Rose 500 / Rose 600
+    if (elapsed < 380) {
+      // Fase 1: Advertencia ámbar
+      color = "#f59e0b";
+    } else {
+      // Fase 2: Parpadeo carmesí urgente antes del colapso
+      const isBlink = Math.floor((elapsed - 380) / 90) % 2 === 0;
+      color = isBlink ? "#f43f5e" : "#e11d48";
+    }
   }
 
   if (isBroken) {
@@ -108,12 +130,11 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
         position={[position[0], posY, position[2]]}
         scale={[1, scaleY, 1]}
         rotation={[0, Math.PI / 6, 0]}
-        castShadow
       >
-        <cylinderGeometry args={[HEX_RADIUS * 0.985, HEX_RADIUS * 0.985, 0.4, 6]} />
+        <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
         <meshStandardMaterial
           color={color}
-          roughness={0.2}
+          roughness={0.3}
           metalness={0.1}
           emissive="#e11d48"
           emissiveIntensity={0.5}
@@ -122,6 +143,16 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
     );
   }
 
+  const handleTrigger = (event: any) => {
+    const otherNode = event.other.rigidBodyObject;
+    if (otherNode && otherNode.userData && otherNode.userData.type === "player") {
+      // Collapse tile immediately during PLAYING mode
+      if (steppedAt === null && gameStatus === "PLAYING") {
+        onStep(id);
+      }
+    }
+  };
+
   return (
     <RigidBody
       type="fixed"
@@ -129,22 +160,13 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
       position={[position[0], position[1], position[2]]}
       friction={0}
       restitution={0}
-      onCollisionEnter={(event) => {
-        const otherNode = event.other.rigidBodyObject;
-        if (otherNode && otherNode.userData && otherNode.userData.type === "player") {
-          // Only collapse tiles during active match (never in LOBBY or COUNTDOWN)
-          if (steppedAt === null && gameStatus === "PLAYING") {
-            onStep(id);
-          }
-        }
-      }}
+      onCollisionEnter={handleTrigger}
     >
-      <mesh scale={[1, scaleY, 1]} rotation={[0, Math.PI / 6, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[HEX_RADIUS * 0.985, HEX_RADIUS * 0.985, 0.4, 6]} />
+      <mesh scale={[1, scaleY, 1]} rotation={[0, Math.PI / 6, 0]} receiveShadow>
+        <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
         <meshStandardMaterial
-          ref={matRef}
           color={color}
-          roughness={0.2}
+          roughness={0.3}
           metalness={0.1}
           emissive={steppedAt !== null ? "#e11d48" : "#000000"}
           emissiveIntensity={steppedAt !== null ? 0.5 : 0}
@@ -153,6 +175,8 @@ function HexTile({ id, position, floor, steppedAt, onStep, gameStatus }: HexTile
     </RigidBody>
   );
 }
+
+const HexTile = React.memo(HexTileComponent);
 
 interface HexGridProps {
   brokenTiles: Record<string, number>;
@@ -176,42 +200,27 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
       return;
     }
 
+    // Generar la torre completa de baldosas de forma estable y persistente (evita recrear colisionadores entre Countdown y Playing)
     const list: any[] = [];
     const rad = mapId === "tower" ? 3 : 4; // 37 baldosas para tower, 61 para classic
+    const numFloors = Math.max(2, Math.min(8, floorsCount));
 
-    if (isCountdown) {
-      // DURANTE LA CUENTA REGRESIVA: Solo el piso superior con barreras protectoras
-      const floorY = topFloorY;
+    for (let f = 0; f < numFloors; f++) {
+      const floorY = (numFloors - 1 - f) * floorDistance;
       for (let q = -rad; q <= rad; q++) {
         const r1 = Math.max(-rad, -q - rad);
         const r2 = Math.min(rad, -q + rad);
         for (let r = r1; r <= r2; r++) {
           const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
           const z = HEX_RADIUS * 1.5 * r;
-          const id = `tile_countdown_${q}_${r}`;
-          list.push({ id, position: [x, floorY, z], floor: 0 });
-        }
-      }
-    } else {
-      // EN PARTIDA ACTIVA (PLAYING o ROUND_OVER): Cargar los N pisos de juego
-      const numFloors = Math.max(2, Math.min(8, floorsCount));
-      for (let f = 0; f < numFloors; f++) {
-        const floorY = (numFloors - 1 - f) * floorDistance;
-        for (let q = -rad; q <= rad; q++) {
-          const r1 = Math.max(-rad, -q - rad);
-          const r2 = Math.min(rad, -q + rad);
-          for (let r = r1; r <= r2; r++) {
-            const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
-            const z = HEX_RADIUS * 1.5 * r;
-            const id = `tile_${f}_${q}_${r}`;
-            list.push({ id, position: [x, floorY, z], floor: f });
-          }
+          const id = `tile_${f}_${q}_${r}`;
+          list.push({ id, position: [x, floorY, z], floor: f });
         }
       }
     }
 
     setTiles(list);
-  }, [mapId, floorsCount, isLobby, isCountdown, topFloorY]);
+  }, [mapId, floorsCount, isLobby, floorDistance]);
 
   // 6 muros de protección perimetrales durante el COUNTDOWN de 5s para evitar caídas previas
   const countdownWalls = [0, 1, 2, 3, 4, 5].map((i) => {

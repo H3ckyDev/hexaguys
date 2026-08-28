@@ -1,15 +1,21 @@
-﻿import { RigidBody, CuboidCollider } from "@react-three/rapier";
+import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
 interface CardboardBoxLobbyProps {
   position?: [number, number, number];
+  gameStatus?: string;
 }
 
 /**
  * Sala de Espera (Lobby) 3D en forma de Caja de Cartón
  * Ubicada de forma independiente y aislada de las torres hexagonales de juego.
  */
-export function CardboardBoxLobby({ position = [60, 0, 0] }: CardboardBoxLobbyProps) {
+export function CardboardBoxLobby({ position = [60, 0, 0], gameStatus }: CardboardBoxLobbyProps) {
+  // Desactivar completamente la caja y sus 4 luces durante la partida para maximizar 60 FPS
+  if (gameStatus === "PLAYING" || gameStatus === "COUNTDOWN") {
+    return null;
+  }
+
   const [posX, posY, posZ] = position;
   const boxWidth = 14; // Ancho en eje X
   const boxLength = 14; // Largo en eje Z
