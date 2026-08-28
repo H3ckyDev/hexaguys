@@ -241,25 +241,6 @@ export function GameUI({
 
         {/* Lado Derecho: Perfil de Usuario y Acciones Rápidas */}
         <div className="flex items-center gap-2.5">
-          {/* Perfil del Jugador con Avatar y Estado */}
-          <div className="flex items-center gap-3 px-3.5 py-1.5 rounded-2xl bg-[#0f152b] border border-[#243464] shadow-md">
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-white border border-white/20 relative shadow-sm shrink-0"
-              style={{ backgroundColor: currentColor }}
-            >
-              <CurrentSkinComponent className="w-4.5 h-4.5 text-white" />
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#0f152b]" />
-            </div>
-
-            <div className="flex flex-col text-left">
-              <span className="text-sm font-black tracking-tight text-white leading-tight">
-                {nickname || "Jugador"}
-              </span>
-              <span className="text-[11px] font-mono text-slate-400 font-bold uppercase">
-                {host ? "Anfitrión" : "Jugador"}
-              </span>
-            </div>
-          </div>
 
           {/* Botón de Lista de Jugadores */}
           <button
