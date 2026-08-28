@@ -19,7 +19,7 @@ const keyboardMap = [
 ];
 
 const GLOBAL_SCORE_PER_WIN = 10;
-const GLOBAL_SCORE_PER_SURVIVAL_INTERVAL = 3_000;
+const GLOBAL_SCORE_PER_SURVIVAL_INTERVAL = 10_000;
 
 function getRoomCodeFromUrl(): string | null {
   if (typeof window === "undefined") return null;
@@ -48,6 +48,7 @@ function App() {
   const [isInGame, setIsInGame] = useState<boolean>(Boolean(initialRoom));
   const [roomCodeToJoin, setRoomCodeToJoin] = useState<string | null>(initialRoom);
   const [connected, setConnected] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   
@@ -76,6 +77,20 @@ function App() {
   });
 
   // Escuchar cambios de navegación en el navegador
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 768px), (pointer: coarse)");
+    const updateDeviceType = () => setIsMobile(mediaQuery.matches);
+
+    updateDeviceType();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", updateDeviceType);
+      return () => mediaQuery.removeEventListener("change", updateDeviceType);
+    }
+
+    mediaQuery.addListener(updateDeviceType);
+    return () => mediaQuery.removeListener(updateDeviceType);
+  }, []);
+
   useEffect(() => {
     // Limpiar parámetro de kick en la URL si existe
     if (typeof window !== "undefined" && window.location.search.includes("kick=afk")) {
@@ -435,6 +450,14 @@ function App() {
     setIsInGame(true);
   };
 
+  if (isMobile === null) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-[#07080b] text-white">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-sky-500" />
+      </div>
+    );
+  }
+
   if (!isInGame) {
     return (
       <LandingPage
@@ -469,6 +492,7 @@ function App() {
           mapId={mapId}
           floorsCount={floorsCount}
           showPlayerPing={showPlayerPing}
+          isMobile={isMobile}
         />
 
         {/* 2. HUD de Rendimiento en una sola línea (FPS y Ping en la esquina inferior derecha) */}
@@ -503,6 +527,7 @@ function App() {
           onTogglePlayerPing={() => setShowPlayerPing((prev) => !prev)}
           volume={volume}
           onVolumeChange={handleVolumeChange}
+          isMobile={isMobile}
         />
       </div>
     </KeyboardControls>

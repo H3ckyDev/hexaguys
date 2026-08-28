@@ -24,6 +24,7 @@ interface GameUIProps {
   onTogglePlayerPing?: () => void;
   volume: number;
   onVolumeChange: (vol: number) => void;
+  isMobile?: boolean;
 }
 
 const COLOR_PALETTE = [
@@ -58,6 +59,7 @@ export function GameUI({
   onTogglePlayerPing,
   volume,
   onVolumeChange,
+  isMobile = false,
 }: GameUIProps) {
   const alivePlayers = players.filter((p) => p.getState("isAlive") !== false);
   const activePlayers = players.filter((p) => !p.getState("isAfk"));
@@ -193,7 +195,7 @@ export function GameUI({
   ];
 
   return (
-    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-5 md:p-7 z-30 select-none font-sans">
+    <div className={`absolute inset-0 pointer-events-none flex flex-col justify-between p-2 sm:p-5 md:p-7 z-30 select-none font-sans ${isMobile ? "mobile-game-ui" : ""}`}>
       {/* TOP DYNAMIC ISLAND BAR */}
       <div className="flex justify-between items-start pointer-events-auto gap-4">
         {/* Game Brand & Action Pill */}
