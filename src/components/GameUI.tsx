@@ -238,7 +238,6 @@ export function GameUI({
             <span className="text-sm font-mono text-amber-300 font-black">{localPlayer?.getState("globalScore") || 0}</span>
             <span className="text-xs text-amber-400/80 font-mono font-bold">PTS</span>
           </div>
-
         </div>
 
         {/* Lado Derecho: Perfil de Usuario y Acciones Rápidas */}

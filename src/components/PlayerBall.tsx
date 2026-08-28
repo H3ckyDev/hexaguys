@@ -60,6 +60,7 @@ export function PlayerBall({
 
   const smoothCamTarget = useRef(new THREE.Vector3(spawnX, spawnY, spawnZ));
   const prevGameStatusRef = useRef(gameStatus);
+  const isInitialMountRef = useRef(true);
   const [, getKeys] = useKeyboardControls();
   const [lastJumpTime, setLastJumpTime] = useState(0);
   const [isGrounded, setIsGrounded] = useState(true);
@@ -138,71 +139,25 @@ export function PlayerBall({
     };
   }, [isLocal, isMobile]);
 
-  useEffect(() => {
-    if (!isLocal || !isMobile) return;
-
-    const isInteractiveTarget = (target: EventTarget | null) => {
-      return target instanceof Element && Boolean(target.closest("button, input, textarea, a"));
-    };
-
-    const handleTouchStart = (event: TouchEvent) => {
-      if (isInteractiveTarget(event.target)) return;
-      const touch = event.changedTouches[0];
-      touchStart.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
-      touchDirection.current = { x: 0, z: 0 };
-    };
-
-    const handleTouchMove = (event: TouchEvent) => {
-      if (!touchStart.current) return;
-      const touch = event.changedTouches[0];
-      const deltaX = touch.clientX - touchStart.current.x;
-      const deltaY = touch.clientY - touchStart.current.y;
-      const distance = Math.hypot(deltaX, deltaY);
-      const maxDistance = 90;
-
-      if (distance > 8) {
-        event.preventDefault();
-        const strength = Math.min(distance, maxDistance) / maxDistance;
-        touchDirection.current = {
-          x: (deltaX / distance) * strength,
-          z: (deltaY / distance) * strength,
-        };
-      }
-    };
-
-    const handleTouchEnd = (event: TouchEvent) => {
-      if (!touchStart.current) return;
-      const touch = event.changedTouches[0];
-      const distance = Math.hypot(
-        touch.clientX - touchStart.current.x,
-        touch.clientY - touchStart.current.y,
-      );
-      const duration = Date.now() - touchStart.current.time;
-
-      if (distance < 18 && duration < 350) {
-        touchJump.current = true;
-      }
-      touchStart.current = null;
-      touchDirection.current = { x: 0, z: 0 };
-    };
-
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("touchend", handleTouchEnd, { passive: true });
-
-    return () => {
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
-    };
-  }, [isLocal, isMobile]);
-
-  // Teletransporte fluido y restablecimiento de posición al cambiar entre Lobby (Caja de Cartón) y Partida (Torre)
+  // Teletransporte EXCLUSIVO ante transiciones reales de estado (Lobby <-> Partida)
   useEffect(() => {
     if (!isLocal) return;
 
-    // A. Al terminar la ronda (ROUND_OVER) o regresar al Lobby (LOBBY): Teletransportar de inmediato a la Caja de Cartón
-    if (gameStatus === "LOBBY" || gameStatus === "ROUND_OVER") {
+    const prevStatus = prevGameStatusRef.current;
+    const isFirst = isInitialMountRef.current;
+    isInitialMountRef.current = false;
+    prevGameStatusRef.current = gameStatus;
+
+    const isLobbyNow = gameStatus === "LOBBY" || gameStatus === "ROUND_OVER";
+    const wasLobbyBefore = prevStatus === "LOBBY" || prevStatus === "ROUND_OVER";
+
+    // Si ya estábamos en el Lobby y seguimos en el Lobby (o viceversa), NO re-spawnear al jugador
+    if (!isFirst && isLobbyNow === wasLobbyBefore) {
+      return;
+    }
+
+    // A. Transición hacia el Lobby (Caja de Cartón en X=60)
+    if (isLobbyNow) {
       smoothCamTarget.current.set(lobbySpawnX, lobbySpawnY, lobbySpawnZ);
       player.setState("pos", { x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });
@@ -218,11 +173,8 @@ export function PlayerBall({
       }
     }
 
-    // B. Al iniciar la cuenta regresiva o la partida (COUNTDOWN / PLAYING): Teletransportar a la cima de la Torre Hexagonal
-    if (
-      (gameStatus === "COUNTDOWN" || gameStatus === "PLAYING") &&
-      (prevGameStatusRef.current === "LOBBY" || prevGameStatusRef.current === "ROUND_OVER")
-    ) {
+    // B. Transición hacia la Partida (Cima de la Torre Hexagonal en X=0)
+    if (!isLobbyNow) {
       smoothCamTarget.current.set(matchSpawnX, matchSpawnY, matchSpawnZ);
       player.setState("pos", { x: matchSpawnX, y: matchSpawnY, z: matchSpawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });
@@ -237,8 +189,6 @@ export function PlayerBall({
         rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
     }
-
-    prevGameStatusRef.current = gameStatus;
   }, [gameStatus, isLocal, player, lobbySpawnX, lobbySpawnY, lobbySpawnZ, matchSpawnX, matchSpawnY, matchSpawnZ]);
 
   // Detección de inactividad AFK confiable con listeners globales en fase de captura (sin auto-kick)
