@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   fetchLeaderboard,
   type LeaderboardPlayer,
@@ -15,6 +15,7 @@ import {
   CrownIcon,
   PlayIcon,
   CalendarIcon,
+  RefreshIcon,
   RobotSkinIcon,
   NinjaSkinIcon,
   AstroSkinIcon,
@@ -36,7 +37,7 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
 
   const localPlayerId = getPersistentPlayerId();
 
-  const loadData = async (m: LeaderboardMetric, p: LeaderboardPeriod) => {
+  const loadData = useCallback(async (m: LeaderboardMetric, p: LeaderboardPeriod) => {
     setIsLoading(true);
     try {
       const data = await fetchLeaderboard(m, p);
@@ -46,13 +47,26 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       loadData(metric, period);
     }
-  }, [isOpen, metric, period]);
+  }, [isOpen, metric, period, loadData]);
+
+  // Listener para cerrar con tecla Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -80,9 +94,15 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
   const myPlayerRecord = myIndex >= 0 ? players[myIndex] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 font-sans antialiased">
+    <div
+      className="fixed inset-0 z-[9999] pointer-events-auto flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 font-sans antialiased cursor-pointer select-none"
+      onClick={() => {
+        playStepSound();
+        onClose();
+      }}
+    >
       <div
-        className="w-full max-w-2xl bg-[#090d1a] border border-[#243464] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.9)] flex flex-col max-h-[90vh] overflow-hidden relative"
+        className="w-full max-w-2xl bg-[#090d1a] border border-[#243464] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.9)] flex flex-col max-h-[90vh] overflow-hidden relative cursor-default pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. Cabecera del Modal */}
@@ -106,15 +126,33 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              playStepSound();
-              onClose();
-            }}
-            className="w-8 h-8 rounded-xl bg-[#141b36] hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
-          >
-            <CloseIcon className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Botón de Recargar */}
+            <button
+              onClick={() => {
+                playStepSound();
+                loadData(metric, period);
+              }}
+              title="Actualizar datos"
+              className={`w-8 h-8 rounded-xl bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] text-slate-300 hover:text-cyan-300 flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
+                isLoading ? "animate-spin text-cyan-400" : ""
+              }`}
+            >
+              <RefreshIcon className="w-4 h-4" />
+            </button>
+
+            {/* Botón de Cerrar */}
+            <button
+              onClick={() => {
+                playStepSound();
+                onClose();
+              }}
+              className="w-8 h-8 rounded-xl bg-[#141b36] hover:bg-rose-500/20 border border-[#243464] hover:border-rose-500/50 text-slate-400 hover:text-rose-300 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+              title="Cerrar modal"
+            >
+              <CloseIcon className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* 2. Controles de Filtrado (Métricas y Periodos) */}

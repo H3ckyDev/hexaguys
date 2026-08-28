@@ -4,9 +4,6 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  query,
-  orderBy,
-  limit,
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "./firebase";
 
@@ -230,46 +227,47 @@ export async function fetchLeaderboard(
 
   if (isFirebaseConfigured && db) {
     try {
-      const q = query(
-        collection(db, "leaderboard_players"),
-        orderBy(sortField, "desc"),
-        limit(50)
-      );
-      const snap = await getDocs(q);
+      const snap = await getDocs(collection(db, "leaderboard_players"));
       const results: LeaderboardPlayer[] = [];
       snap.forEach((d) => {
-        const item = d.data() as LeaderboardPlayer;
-        // Ajustar reseteos semanales/mensuales al vuelo
-        if (period === "weekly" && item.lastWeekKey !== currentWeek) {
-          item.weeklyScore = 0;
-          item.weeklyMatches = 0;
-          item.weeklyWins = 0;
-        }
-        if (period === "monthly" && item.lastMonthKey !== currentMonth) {
-          item.monthlyScore = 0;
-          item.monthlyMatches = 0;
-          item.monthlyWins = 0;
-        }
-        results.push(item);
+        const item = d.data() as Partial<LeaderboardPlayer>;
+        const playerItem: LeaderboardPlayer = {
+          playerId: d.id || item.playerId || "unknown",
+          nickname: item.nickname || "Jugador",
+          skin: item.skin || "robot",
+          color: item.color || "#38bdf8",
+          allTimeScore: item.allTimeScore || 0,
+          allTimeMatches: item.allTimeMatches || 0,
+          allTimeWins: item.allTimeWins || 0,
+          weeklyScore: item.lastWeekKey === currentWeek ? (item.weeklyScore || 0) : 0,
+          weeklyMatches: item.lastWeekKey === currentWeek ? (item.weeklyMatches || 0) : 0,
+          weeklyWins: item.lastWeekKey === currentWeek ? (item.weeklyWins || 0) : 0,
+          monthlyScore: item.lastMonthKey === currentMonth ? (item.monthlyScore || 0) : 0,
+          monthlyMatches: item.lastMonthKey === currentMonth ? (item.monthlyMatches || 0) : 0,
+          monthlyWins: item.lastMonthKey === currentMonth ? (item.monthlyWins || 0) : 0,
+          lastWeekKey: item.lastWeekKey || currentWeek,
+          lastMonthKey: item.lastMonthKey || currentMonth,
+          updatedAt: item.updatedAt || Date.now(),
+        };
+        results.push(playerItem);
       });
 
-      if (results.length > 0) {
-        return results.sort((a, b) => Number(b[sortField]) - Number(a[sortField]));
-      }
+      console.log(`[Leaderboard] Obtenidos ${results.length} jugadores de Firestore (${metric} / ${period}):`, results);
+      return results.sort((a, b) => Number(b[sortField] || 0) - Number(a[sortField] || 0)).slice(0, 50);
     } catch (error) {
-      console.warn("[Leaderboard] Failed to fetch from Firebase, using local data:", error);
+      console.warn("[Leaderboard] Error al consultar Firestore, usando datos locales:", error);
     }
   }
 
   // Fallback local
   const list = getLocalPlayers().map((item) => {
     const cloned = { ...item };
-    if (period === "weekly" && cloned.lastWeekKey !== currentWeek) {
+    if (cloned.lastWeekKey !== currentWeek) {
       cloned.weeklyScore = 0;
       cloned.weeklyMatches = 0;
       cloned.weeklyWins = 0;
     }
-    if (period === "monthly" && cloned.lastMonthKey !== currentMonth) {
+    if (cloned.lastMonthKey !== currentMonth) {
       cloned.monthlyScore = 0;
       cloned.monthlyMatches = 0;
       cloned.monthlyWins = 0;
@@ -277,5 +275,5 @@ export async function fetchLeaderboard(
     return cloned;
   });
 
-  return list.sort((a, b) => Number(b[sortField]) - Number(a[sortField])).slice(0, 50);
+  return list.sort((a, b) => Number(b[sortField] || 0) - Number(a[sortField] || 0)).slice(0, 50);
 }
