@@ -58,48 +58,37 @@ interface HexTileProps {
 function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTileProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
-
-  const [isBroken, setIsBroken] = useState(() => {
-    if (steppedAt === null) return false;
-    return Date.now() - steppedAt >= STEP_DELAY;
-  });
-
-  const [isFullyDestroyed, setIsFullyDestroyed] = useState(() => {
-    if (steppedAt === null) return false;
-    return Date.now() - steppedAt >= STEP_DELAY + FALL_DURATION_MS;
-  });
+  const [, forceUpdate] = useState(0);
 
   useEffect(() => {
-    if (steppedAt === null) {
-      setIsBroken(false);
-      setIsFullyDestroyed(false);
-      return;
-    }
+    if (steppedAt === null) return;
 
     const elapsed = Date.now() - steppedAt;
     const breakRemaining = STEP_DELAY - elapsed;
     const destroyRemaining = (STEP_DELAY + FALL_DURATION_MS) - elapsed;
 
-    if (breakRemaining <= 0) {
-      setIsBroken(true);
-      playBreakSound();
-    } else {
-      const breakTimer = setTimeout(() => {
-        setIsBroken(true);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    if (breakRemaining > 0) {
+      timers.push(setTimeout(() => {
         playBreakSound();
-      }, breakRemaining);
-      return () => clearTimeout(breakTimer);
+        forceUpdate((n) => n + 1);
+      }, breakRemaining));
     }
 
-    if (destroyRemaining <= 0) {
-      setIsFullyDestroyed(true);
-    } else {
-      const destroyTimer = setTimeout(() => {
-        setIsFullyDestroyed(true);
-      }, destroyRemaining);
-      return () => clearTimeout(destroyTimer);
+    if (destroyRemaining > 0) {
+      timers.push(setTimeout(() => {
+        forceUpdate((n) => n + 1);
+      }, destroyRemaining));
     }
+
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, [steppedAt]);
+
+  const isBroken = steppedAt !== null && Date.now() - steppedAt >= STEP_DELAY;
+  const isFullyDestroyed = steppedAt !== null && Date.now() - steppedAt >= STEP_DELAY + FALL_DURATION_MS;
 
   // Actualización en tiempo real a 60-144 FPS dentro del bucle de Three.js
   useFrame(() => {
@@ -121,25 +110,30 @@ function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTilePro
     }
 
     // 2. Animación fluida de vibración y caída directa sobre el Mesh de Three.js
-    if (meshRef.current && steppedAt !== null) {
-      const elapsed = Date.now() - steppedAt;
-      if (elapsed < STEP_DELAY) {
-        // Fase de advertencia / vibración
-        const progress = Math.min(1, elapsed / STEP_DELAY);
-        const wave = Math.sin(elapsed * 0.04) * (0.02 + progress * 0.06);
-        meshRef.current.scale.set(1, 1 - progress * 0.22 + wave, 1);
-        meshRef.current.position.y = 0;
+    if (meshRef.current) {
+      if (steppedAt !== null) {
+        const elapsed = Date.now() - steppedAt;
+        if (elapsed < STEP_DELAY) {
+          // Fase de advertencia / vibración
+          const progress = Math.min(1, elapsed / STEP_DELAY);
+          const wave = Math.sin(elapsed * 0.04) * (0.02 + progress * 0.06);
+          meshRef.current.scale.set(1, 1 - progress * 0.22 + wave, 1);
+          meshRef.current.position.y = 0;
+        } else {
+          // Fase de caída física al abismo
+          const fallProgress = Math.min(1, (elapsed - STEP_DELAY) / FALL_DURATION_MS);
+          meshRef.current.position.y = -fallProgress * 18;
+          const s = Math.max(0, 1 - fallProgress);
+          meshRef.current.scale.set(s, s, s);
+        }
       } else {
-        // Fase de caída física al abismo
-        const fallProgress = Math.min(1, (elapsed - STEP_DELAY) / FALL_DURATION_MS);
-        meshRef.current.position.y = -fallProgress * 18;
-        const s = Math.max(0, 1 - fallProgress);
-        meshRef.current.scale.set(s, s, s);
+        meshRef.current.scale.set(1, 1, 1);
+        meshRef.current.position.y = 0;
       }
     }
   });
 
-  // Si ya colapsó y terminó de caer, se elimina completamente de la escena (retorna null)
+  // Si ya colapsó y terminó de caer, se elimina completamente de la escena
   if (isFullyDestroyed) {
     return null;
   }
@@ -269,15 +263,17 @@ export function HexGrid({
     };
   });
 
+  const isMatchActive = gameStatus === "PLAYING";
+
   return (
     <group>
-      {/* Baldosas hexagonales del juego con clave única vinculada al número de pisos */}
+      {/* Baldosas hexagonales del juego: en Lobby o Countdown todas las baldosas son 100% intactas */}
       {tiles.map((tile) => (
         <HexTile
           key={`${mapId}_${numFloors}_${tile.id}`}
           position={tile.position}
           floor={tile.floor}
-          steppedAt={brokenTiles[tile.id] || null}
+          steppedAt={isMatchActive ? (brokenTiles[tile.id] || null) : null}
           gameStatus={gameStatus}
         />
       ))}

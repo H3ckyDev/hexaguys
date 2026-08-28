@@ -74,6 +74,10 @@ export function usePlayroomSession(isInGame: boolean, roomCodeToJoin: string | n
         }
       });
 
+      RPC.register("resetTiles", async () => {
+        setBrokenTiles({});
+      });
+
       RPC.register("chatMessage", async (msg: ChatMessage) => {
         if (msg && msg.text) {
           setChatMessages((prev) => [...prev.slice(-49), msg]);

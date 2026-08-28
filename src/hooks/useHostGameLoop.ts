@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { isHost, getState, setState } from "playroomkit";
+import { isHost, getState, setState, RPC } from "playroomkit";
 import { SCORE_PER_WIN, SCORE_PER_SURVIVAL_INTERVAL, COUNTDOWN_DURATION } from "../constants/game";
 import type { PlayerState } from "../types/game";
 
@@ -108,6 +108,7 @@ export function useHostGameLoop(players: PlayerState[], connected: boolean) {
     });
 
     setState("brokenTiles", {});
+    RPC.call("resetTiles", {}, RPC.Mode.ALL);
     setState("winnerId", null);
     setState("countdown", COUNTDOWN_DURATION);
     setState("status", "COUNTDOWN");
