@@ -14,7 +14,6 @@ import {
   GridIcon,
   UserIcon,
   CoinIcon,
-  DiamondIcon,
   RobotSkinIcon,
   NinjaSkinIcon,
   AstroSkinIcon,
