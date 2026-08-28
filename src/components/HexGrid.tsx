@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { RigidBody } from "@react-three/rapier";
+import { RigidBody, CylinderCollider, CuboidCollider } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { playBreakSound } from "../utils/sounds";
 
@@ -40,15 +40,12 @@ export function isHexInGrid(q: number, r: number, mapId = "classic") {
 }
 
 interface HexTileProps {
-  id: string;
   position: [number, number, number];
   floor: number;
   steppedAt: number | null;
-  onStep: (id: string) => void;
-  gameStatus?: string;
 }
 
-function HexTileComponent({ id, position, floor, steppedAt, onStep, gameStatus }: HexTileProps) {
+function HexTileComponent({ position, floor, steppedAt }: HexTileProps) {
   const [isBroken, setIsBroken] = useState(false);
   const [scaleY, setScaleY] = useState(1);
   const [posY, setPosY] = useState(position[1]);
@@ -120,25 +117,21 @@ function HexTileComponent({ id, position, floor, steppedAt, onStep, gameStatus }
     }
   }
 
-  const handleTrigger = (event: any) => {
-    const otherNode = event.other.rigidBodyObject;
-    if (otherNode && otherNode.userData && otherNode.userData.type === "player") {
-      // Collapse tile immediately during PLAYING mode
-      if (steppedAt === null && gameStatus === "PLAYING") {
-        onStep(id);
-      }
-    }
-  };
-
   return (
     <RigidBody
       type="fixed"
-      colliders="hull"
-      position={[position[0], isBroken ? -100 : position[1], position[2]]}
+      colliders={false}
+      position={position}
       friction={0}
       restitution={0}
-      onCollisionEnter={handleTrigger}
     >
+      <CylinderCollider
+        args={[0.2, HEX_RADIUS * 1.0]}
+        sensor={isBroken}
+        friction={0}
+        restitution={0}
+      />
+
       {/* Mesh visual animado: se muestra mientras no haya caído al abismo */}
       {posY > -20 && (
         <mesh
@@ -165,13 +158,13 @@ const HexTile = React.memo(HexTileComponent);
 
 interface HexGridProps {
   brokenTiles: Record<string, number>;
-  onStep: (id: string) => void;
+  onStep?: (id: string) => void;
   mapId: string;
   floorsCount?: number;
   gameStatus?: string;
 }
 
-export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
+export function HexGrid({ brokenTiles, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
   const [tiles, setTiles] = useState<any[]>([]);
   const isCountdown = gameStatus === "COUNTDOWN";
   const floorDistance = 4.5;
@@ -219,25 +212,29 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
       {tiles.map((tile) => (
         <HexTile
           key={tile.id}
-          id={tile.id}
           position={tile.position}
           floor={tile.floor}
           steppedAt={brokenTiles[tile.id] || null}
-          onStep={onStep}
-          gameStatus={gameStatus}
         />
       ))}
 
-      {/* Muros de protección persistentes: se teletransportan a Y=-100 cuando no es COUNTDOWN */}
+      {/* Muros de protección persistentes con sensor dinámico */}
       {countdownWalls.map((w) => (
         <RigidBody
           key={w.id}
           type="fixed"
-          position={[w.position[0], isCountdown ? w.position[1] : -100, w.position[2]]}
+          colliders={false}
+          position={w.position}
           rotation={w.rotation}
           friction={0}
           restitution={0.2}
         >
+          <CuboidCollider
+            args={[3.9, 1.6, 0.15]}
+            sensor={!isCountdown}
+            friction={0}
+            restitution={0.2}
+          />
           {isCountdown && (
             <group>
               {/* Cristal de energía */}
