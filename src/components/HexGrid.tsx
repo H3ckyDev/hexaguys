@@ -8,6 +8,7 @@ import { activeLocalPlayerPos } from "../utils/playerTracking";
 
 export const HEX_RADIUS = 1.0;
 const STEP_DELAY = TILE_STEP_DELAY_MS;
+const FALL_DURATION_MS = 380; // Tiempo de animación de caída antes de borrarse completamente
 
 /**
  * Convierte coordenadas 3D de mundo (X, Z) a coordenadas hexagonales axiales (Q, R)
@@ -55,36 +56,55 @@ interface HexTileProps {
 }
 
 function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTileProps) {
-  const [isBroken, setIsBroken] = useState(false);
-  const [scaleY, setScaleY] = useState(1);
-  const [dropY, setDropY] = useState(0);
+  const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  const [isBroken, setIsBroken] = useState(() => {
+    if (steppedAt === null) return false;
+    return Date.now() - steppedAt >= STEP_DELAY;
+  });
+
+  const [isFullyDestroyed, setIsFullyDestroyed] = useState(() => {
+    if (steppedAt === null) return false;
+    return Date.now() - steppedAt >= STEP_DELAY + FALL_DURATION_MS;
+  });
 
   useEffect(() => {
     if (steppedAt === null) {
       setIsBroken(false);
-      setScaleY(1);
-      setDropY(0);
+      setIsFullyDestroyed(false);
       return;
     }
 
     const elapsed = Date.now() - steppedAt;
-    const remaining = STEP_DELAY - elapsed;
+    const breakRemaining = STEP_DELAY - elapsed;
+    const destroyRemaining = (STEP_DELAY + FALL_DURATION_MS) - elapsed;
 
-    if (remaining <= 0) {
+    if (breakRemaining <= 0) {
       setIsBroken(true);
       playBreakSound();
     } else {
-      const timer = setTimeout(() => {
+      const breakTimer = setTimeout(() => {
         setIsBroken(true);
         playBreakSound();
-      }, remaining);
-      return () => clearTimeout(timer);
+      }, breakRemaining);
+      return () => clearTimeout(breakTimer);
+    }
+
+    if (destroyRemaining <= 0) {
+      setIsFullyDestroyed(true);
+    } else {
+      const destroyTimer = setTimeout(() => {
+        setIsFullyDestroyed(true);
+      }, destroyRemaining);
+      return () => clearTimeout(destroyTimer);
     }
   }, [steppedAt]);
 
   // Actualización en tiempo real a 60-144 FPS dentro del bucle de Three.js
-  useFrame((_, delta) => {
+  useFrame(() => {
+    if (isFullyDestroyed) return;
+
     // 1. Transparencia en tiempo real de pisos superiores
     if (matRef.current) {
       const isPlaying = gameStatus === "PLAYING";
@@ -100,21 +120,29 @@ function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTilePro
       }
     }
 
-    // 2. Animación de baldosas pisadas / colapso
-    if (steppedAt === null && !isBroken) return;
-
-    if (steppedAt !== null && !isBroken) {
+    // 2. Animación fluida de vibración y caída directa sobre el Mesh de Three.js
+    if (meshRef.current && steppedAt !== null) {
       const elapsed = Date.now() - steppedAt;
-      const progress = Math.min(1, elapsed / STEP_DELAY);
-      const wave = Math.sin(elapsed * 0.04) * (0.02 + progress * 0.06);
-      setScaleY(1 - progress * 0.22 + wave);
-    }
-
-    if (isBroken && dropY > -30) {
-      setDropY((prev) => prev - delta * 20);
-      setScaleY((prev) => Math.max(0, prev - delta * 3));
+      if (elapsed < STEP_DELAY) {
+        // Fase de advertencia / vibración
+        const progress = Math.min(1, elapsed / STEP_DELAY);
+        const wave = Math.sin(elapsed * 0.04) * (0.02 + progress * 0.06);
+        meshRef.current.scale.set(1, 1 - progress * 0.22 + wave, 1);
+        meshRef.current.position.y = 0;
+      } else {
+        // Fase de caída física al abismo
+        const fallProgress = Math.min(1, (elapsed - STEP_DELAY) / FALL_DURATION_MS);
+        meshRef.current.position.y = -fallProgress * 18;
+        const s = Math.max(0, 1 - fallProgress);
+        meshRef.current.scale.set(s, s, s);
+      }
     }
   });
+
+  // Si ya colapsó y terminó de caer, se elimina completamente de la escena (retorna null)
+  if (isFullyDestroyed) {
+    return null;
+  }
 
   const FLOOR_COLORS = [
     "#38bdf8", // Sky Blue (Piso 0 / Superior)
@@ -156,27 +184,25 @@ function HexTileComponent({ position, floor, steppedAt, gameStatus }: HexTilePro
         />
       )}
 
-      {dropY > -30 && (
-        <mesh
-          position={[0, isBroken ? dropY : 0, 0]}
-          scale={[1, scaleY, 1]}
-          rotation={[0, Math.PI / 6, 0]}
-          receiveShadow={!isBroken}
-        >
-          <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
-          <meshStandardMaterial
-            ref={matRef}
-            color={color}
-            roughness={0.3}
-            metalness={0.1}
-            transparent={false}
-            opacity={1.0}
-            depthWrite={true}
-            emissive={steppedAt !== null ? "#e11d48" : color}
-            emissiveIntensity={steppedAt !== null ? 0.6 : 0.08}
-          />
-        </mesh>
-      )}
+      <mesh
+        ref={meshRef}
+        position={[0, 0, 0]}
+        rotation={[0, Math.PI / 6, 0]}
+        receiveShadow={!isBroken}
+      >
+        <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
+        <meshStandardMaterial
+          ref={matRef}
+          color={color}
+          roughness={0.3}
+          metalness={0.1}
+          transparent={false}
+          opacity={1.0}
+          depthWrite={true}
+          emissive={steppedAt !== null ? "#e11d48" : color}
+          emissiveIntensity={steppedAt !== null ? 0.6 : 0.08}
+        />
+      </mesh>
     </RigidBody>
   );
 }
@@ -245,7 +271,7 @@ export function HexGrid({
 
   return (
     <group>
-      {/* Baldosas hexagonales del juego con clave única vinculada al número de pisos para evitar reuso erróneo */}
+      {/* Baldosas hexagonales del juego con clave única vinculada al número de pisos */}
       {tiles.map((tile) => (
         <HexTile
           key={`${mapId}_${numFloors}_${tile.id}`}
