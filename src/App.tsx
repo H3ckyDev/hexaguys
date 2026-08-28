@@ -541,6 +541,7 @@ function App() {
           messages={messages}
           onSendMessage={handleSendMessage}
           localPlayerId={myPlayer()?.id}
+          isMobile={isMobile}
         />
 
         {/* 4. Interfaz 2D React Superpuesta y Modales (Siempre por encima de la escena 3D) */}

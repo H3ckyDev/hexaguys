@@ -220,16 +220,24 @@ export function GameUI({
       <header className="flex justify-between items-center pointer-events-auto gap-3 w-full max-w-6xl mx-auto z-50">
         {/* Lado Izquierdo: Cápsulas de Estado (Sala, Pisos, Puntos) */}
         <div className="flex items-center gap-2.5 overflow-x-auto py-1">
-          {/* Cápsula Naranja: Código de Sala con botón de copiar */}
-          <button
-            onClick={handleCopyLink}
-            className="px-4 py-2 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-orange-500/80 text-sm font-bold text-orange-400 hover:text-orange-300 flex items-center gap-2 shadow-[0_0_12px_rgba(249,115,22,0.25)] transition-all cursor-pointer active:scale-95"
-            title="Copiar código de invitación"
-          >
-            <CopyIcon className="w-4 h-4 text-orange-400" />
-            <span className="font-mono text-sm text-white font-bold">{getRoomCode() || "SALA"}</span>
-            <span className="text-xs text-orange-400/80 uppercase font-bold tracking-wider">Copiar</span>
-          </button>
+          <div className={isMobile && gameStatus === "LOBBY" ? "flex flex-col items-start gap-1" : "contents"}>
+            {/* Cápsula Naranja: Código de Sala con botón de copiar */}
+            <button
+              onClick={handleCopyLink}
+              className="px-4 py-2 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-orange-500/80 text-sm font-bold text-orange-400 hover:text-orange-300 flex items-center gap-2 shadow-[0_0_12px_rgba(249,115,22,0.25)] transition-all cursor-pointer active:scale-95"
+              title="Copiar código de invitación"
+            >
+              <CopyIcon className="w-4 h-4 text-orange-400" />
+              <span className="font-mono text-sm text-white font-bold">{getRoomCode() || "SALA"}</span>
+              <span className="text-xs text-orange-400/80 uppercase font-bold tracking-wider">Copiar</span>
+            </button>
+
+            {isMobile && gameStatus === "LOBBY" && (
+              <span className="max-w-36 truncate pl-1 text-[11px] font-bold text-white/80">
+                {nickname || "Jugador"}
+              </span>
+            )}
+          </div>
 
           {/* Cápsula Dorada: Puntuación del Jugador */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#11172f] border border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.2)]">

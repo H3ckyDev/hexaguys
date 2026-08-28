@@ -221,7 +221,7 @@ export function PlayerBall({
       }
 
       const isHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
-      const isInactive = Date.now() - lastActivityRef.current > 20000; // 20s de inactividad
+      const isInactive = Date.now() - lastActivityRef.current > 120000; // 120s de inactividad
 
       const shouldBeAfk = isHidden || isInactive;
       const currentAfk = Boolean(player.getState("isAfk"));
@@ -555,7 +555,7 @@ export function PlayerBall({
         </group>
 
         {/* Etiqueta flotante con nombre, insignia AFK y burbuja de chat 3D */}
-        {shouldBeVisible && (
+        {shouldBeVisible && !(isMobile && isLocal && gameStatus === "LOBBY") && (
           <Html distanceFactor={10} position={[0, 1.5, 0]} center zIndexRange={[10, 0]}>
             <div className="flex flex-col items-center pointer-events-none select-none">
               {scoreNotification && (

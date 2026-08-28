@@ -16,11 +16,12 @@ interface ChatOverlayProps {
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
   localPlayerId?: string;
+  isMobile?: boolean;
 }
 
 const QUICK_PHRASES = ["¡GG!", "¡Cuidado!", "¡Al centro!", "¡Bien jugado!"];
 
-export function ChatOverlay({ messages, onSendMessage, localPlayerId }: ChatOverlayProps) {
+export function ChatOverlay({ messages, onSendMessage, localPlayerId, isMobile = false }: ChatOverlayProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
@@ -114,7 +115,7 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId }: ChatOver
   };
 
   return (
-    <div className="fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-40 flex flex-col items-start pointer-events-none font-sans antialiased">
+    <div className={`fixed z-40 flex flex-col items-start pointer-events-none font-sans antialiased ${isMobile ? "left-2 top-1/2 -translate-y-1/2" : "bottom-4 left-4 sm:bottom-6 sm:left-6"}`}>
       {/* Ventana de Chat Expandida */}
       {isOpen && (
         <div className="w-72 sm:w-80 md:w-96 rounded-3xl p-4 sm:p-5 mb-2.5 flex flex-col gap-3 bg-[#0f152b] border border-[#243464] shadow-[0_20px_50px_rgba(0,0,0,0.8)] pointer-events-auto animate-in slide-in-from-bottom duration-150">
@@ -233,11 +234,11 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId }: ChatOver
           playStepSound();
           setIsOpen((prev) => !prev);
         }}
-        className="px-4.5 py-3 rounded-2xl bg-[#0f152b] hover:bg-[#141b36] border border-[#243464] hover:border-cyan-400 flex items-center gap-2.5 pointer-events-auto shadow-[0_10px_25px_rgba(0,0,0,0.6)] transition-all cursor-pointer active:scale-95"
+        className={`${isMobile ? "w-12 h-12 rounded-full" : "px-4.5 py-3 rounded-2xl"} bg-[#0f152b] hover:bg-[#141b36] border border-[#243464] hover:border-cyan-400 flex items-center justify-center gap-2.5 pointer-events-auto shadow-[0_10px_25px_rgba(0,0,0,0.6)] transition-all cursor-pointer active:scale-95`}
         title="Abrir chat"
       >
-        <ChatIcon className="w-4.5 h-4.5 text-cyan-400" />
-        <span className="text-sm font-bold font-mono uppercase text-white">CHAT</span>
+        <ChatIcon className={`${isMobile ? "w-6 h-6" : "w-4.5 h-4.5"} text-cyan-400`} />
+        {!isMobile && <span className="text-sm font-bold font-mono uppercase text-white">CHAT</span>}
         {unreadCount > 0 && !isOpen && (
           <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-xs font-mono font-bold shadow-[0_0_10px_rgba(37,99,235,0.6)]">
             {unreadCount}
