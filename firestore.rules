@@ -2,25 +2,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Reglas para la colección del tablón de clasificación
+    // Permitir lectura y escritura en la colección de clasificaciones
     match /leaderboard_players/{playerId} {
-      // Lectura pública permitida para que cualquier jugador pueda ver el ranking
-      allow read: if true;
-      
-      // Escritura y actualización con validaciones de seguridad básicas
-      allow create, update: if request.resource.data.nickname is string
-        && request.resource.data.nickname.size() >= 1
-        && request.resource.data.nickname.size() <= 25
-        && request.resource.data.skin is string
-        && request.resource.data.color is string
-        && request.resource.data.allTimeScore is number
-        && request.resource.data.allTimeScore >= 0
-        && request.resource.data.allTimeMatches is number
-        && request.resource.data.allTimeMatches >= 0;
-        
-      // Eliminación bloqueada desde el cliente
-      allow delete: if false;
+      allow read, write: if true;
     }
   }
 }

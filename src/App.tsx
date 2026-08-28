@@ -255,9 +255,18 @@ function App() {
   // Sonido, notificación Sileo y registro en el tablón de clasificación al finalizar ronda
   const prevWinnerNotified = useRef<string | null>(null);
   const recordedRoundRef = useRef<boolean>(false);
+  const roundStartScoreRef = useRef<number>(0);
 
   useEffect(() => {
     if (!connected) return;
+
+    // Al iniciar el conteo de la ronda, capturar la puntuación base de inicio
+    if (gameStatus === "COUNTDOWN") {
+      roundStartScoreRef.current = myPlayer()?.getState("globalScore") || 0;
+      recordedRoundRef.current = false;
+      prevWinnerNotified.current = null;
+    }
+
     if (gameStatus === "ROUND_OVER") {
       if (!recordedRoundRef.current) {
         recordedRoundRef.current = true;
@@ -268,13 +277,27 @@ function App() {
           const nickname = myP.getState("name") || myP.getProfile()?.name || "Jugador";
           const skin = myP.getState("skin") || "robot";
           const color = myP.getState("color") || myP.getProfile()?.color?.hex || "#38bdf8";
+          
+          // Puntos ganados durante esta ronda específica (supervivencia + victoria)
+          const currentTotalScore = myP.getState("globalScore") || 0;
+          let scoreGained = Math.max(0, currentTotalScore - roundStartScoreRef.current);
+          if (isWin && scoreGained < GLOBAL_SCORE_PER_WIN) {
+            scoreGained = GLOBAL_SCORE_PER_WIN;
+          }
+
+          console.log("[Leaderboard] Inserción de estadísticas al finalizar partida:", {
+            nickname,
+            skin,
+            scoreGained,
+            isWin,
+          });
 
           recordMatchResult({
             playerId: getPersistentPlayerId(),
             nickname,
             skin,
             color,
-            scoreGained: isWin ? GLOBAL_SCORE_PER_WIN : 1, // 10 puntos por victoria, 1 punto por participar
+            scoreGained,
             isWin,
           });
         }
@@ -298,7 +321,6 @@ function App() {
       }
     } else if (gameStatus === "PLAYING") {
       prevWinnerNotified.current = null;
-      recordedRoundRef.current = false;
     }
   }, [gameStatus, winnerId, connected, players]);
 
