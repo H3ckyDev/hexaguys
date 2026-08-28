@@ -56,16 +56,18 @@ export const GameHeader = memo(function GameHeader({
     <header className="flex justify-between items-center pointer-events-auto gap-3 w-full max-w-6xl mx-auto z-50">
       {/* Lado Izquierdo: Código de Sala y Puntuación Tabular */}
       <div className="flex items-center gap-2 overflow-x-auto py-1">
-        {/* Código de Sala con Botón de Copiar */}
-        <button
-          onClick={handleCopyLink}
-          className="btn-esports-ghost px-3.5 py-2 text-xs font-mono flex items-center gap-2 cursor-pointer"
-          title="Copiar código de invitación"
-        >
-          <CopyIcon className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="text-white font-black">{roomCode || getRoomCode() || "SALA"}</span>
-          <span className="text-[10px] text-cyan-300 uppercase tracking-wider hidden sm:inline-block">COPIAR</span>
-        </button>
+        {/* Código de Sala con Botón de Copiar (Solo en Lobby) */}
+        {!isPlaying && (
+          <button
+            onClick={handleCopyLink}
+            className="btn-esports-ghost px-3.5 py-2 text-xs font-mono flex items-center gap-2 cursor-pointer"
+            title="Copiar código de invitación"
+          >
+            <CopyIcon className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-white font-black">{roomCode || getRoomCode() || "SALA"}</span>
+            <span className="text-[10px] text-cyan-300 uppercase tracking-wider hidden sm:inline-block">COPIAR</span>
+          </button>
+        )}
 
         {/* Cápsula Dorada: Puntuación Tabular del Jugador */}
         <div className="flex items-center gap-2 px-3 py-2 bg-[#0a0d18] border border-amber-500/40 rounded-[0.25rem]">
@@ -88,15 +90,17 @@ export const GameHeader = memo(function GameHeader({
 
       {/* Lado Derecho: Ranking, Participantes y Ajustes */}
       <div className="flex items-center gap-2 relative">
-        {/* Botón de Tabla de Clasificación / Ranking */}
-        <button
-          onClick={onOpenLeaderboard}
-          className="btn-esports-gold px-3.5 py-2 flex items-center gap-2 text-xs cursor-pointer"
-          title="Ver Tabla de Clasificación"
-        >
-          <TrophyIcon className="w-3.5 h-3.5 text-black" />
-          <span className="hidden sm:inline-block font-black">RANKING</span>
-        </button>
+        {/* Botón de Tabla de Clasificación / Ranking (Solo en Lobby) */}
+        {!isPlaying && (
+          <button
+            onClick={onOpenLeaderboard}
+            className="btn-esports-gold px-3.5 py-2 flex items-center gap-2 text-xs cursor-pointer"
+            title="Ver Tabla de Clasificación"
+          >
+            <TrophyIcon className="w-3.5 h-3.5 text-black" />
+            <span className="hidden sm:inline-block font-black">RANKING</span>
+          </button>
+        )}
 
         {/* Botón de Lista de Jugadores */}
         <button

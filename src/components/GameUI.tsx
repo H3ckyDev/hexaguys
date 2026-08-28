@@ -192,7 +192,7 @@ export function GameUI({
             playStepSound();
             setShowLeaderboard(true);
           }}
-          isPlaying={gameStatus === "PLAYING"}
+          isPlaying={gameStatus === "PLAYING" || gameStatus === "COUNTDOWN"}
         />
         <ParticipantsDropdown
           players={players}
