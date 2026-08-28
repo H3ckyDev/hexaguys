@@ -30,7 +30,7 @@ export function useTileDetector({ mapId, floorsCount, onStepTile }: UseTileDetec
     
     for (let f = 0; f < numFloors; f++) {
       const floorY = (numFloors - 1 - f) * FLOOR_SPACING;
-      if (translationY >= floorY + 0.1 && translationY <= floorY + 0.95) {
+      if (translationY >= floorY - 0.2 && translationY <= floorY + 1.8) {
         const isStationary = horizontalSpeed < 0.5;
         const footOffsets = isStationary ? FOOT_OFFSETS_STATIONARY : FOOT_OFFSETS_MOVING;
         const checkedTiles = new Set<string>();

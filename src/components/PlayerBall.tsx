@@ -131,7 +131,7 @@ export function PlayerBall({
 
         broadcastState(translation, velocity);
 
-        if (gameStatus === "PLAYING" && grounded && Math.abs(velocity.y) < 1.2) {
+        if (gameStatus === "PLAYING" && grounded) {
           detectTiles(translation.x, translation.y, translation.z, horizontalSpeed);
         }
       }
