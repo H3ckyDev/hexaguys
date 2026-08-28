@@ -14,11 +14,13 @@ import {
   GridIcon,
   UserIcon,
   CoinIcon,
+  TrophyIcon,
   RobotSkinIcon,
   NinjaSkinIcon,
   AstroSkinIcon,
   AlienSkinIcon,
 } from "./Icons";
+import { LeaderboardModal } from "./LeaderboardModal";
 
 interface GameUIProps {
   players: any[];
@@ -93,6 +95,7 @@ export function GameUI({
   const [showLobbyDrawer, setShowLobbyDrawer] = useState(false);
   const [showEndCustomizer, setShowEndCustomizer] = useState(false);
   const [showPlayersMenu, setShowPlayersMenu] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const currentSkin = localPlayer?.getState("skin") || "robot";
   const currentColor = localPlayer?.getState("color") || localPlayer?.getProfile()?.color?.hex || COLOR_PALETTE[0].hex;
@@ -212,8 +215,6 @@ export function GameUI({
     return winner?.getState("color") || winner?.getProfile()?.color?.hex || "#ffffff";
   };
 
-  const CurrentSkinComponent = SKINS_LIST.find((s) => s.id === currentSkin)?.Icon || RobotSkinIcon;
-
   return (
     <div className={`absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-30 select-none font-sans antialiased ${isMobile ? "mobile-game-ui" : ""}`}>
       {/* 1. BARRA SUPERIOR (Cápsulas a la izquierda, Centro despejado para notificaciones, Perfil a la derecha) */}
@@ -241,6 +242,18 @@ export function GameUI({
 
         {/* Lado Derecho: Perfil de Usuario y Acciones Rápidas */}
         <div className="flex items-center gap-2.5">
+          {/* Botón de Tabla de Clasificación / Ranking */}
+          <button
+            onClick={() => {
+              playStepSound();
+              setShowLeaderboard(true);
+            }}
+            className="px-3.5 py-2 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-amber-500/60 hover:border-amber-400 flex items-center gap-2 text-amber-300 hover:text-amber-200 text-xs font-mono font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.15)] active:scale-95"
+            title="Ver Tabla de Clasificación"
+          >
+            <TrophyIcon className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline-block uppercase tracking-wider">RANKING</span>
+          </button>
 
           {/* Botón de Lista de Jugadores */}
           <button
@@ -923,6 +936,13 @@ export function GameUI({
           </div>
         </footer>
       )}
+
+      {/* 5. MODAL DE CLASIFICACIÓN / LEADERBOARD */}
+      <LeaderboardModal
+        isOpen={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
+        currentNickname={nickname}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { LandingPage } from "./components/LandingPage";
 import { playWinSound, playFallSound, playStepSound, playChatSound, setGlobalVolume, getGlobalVolume } from "./utils/sounds";
 import { PerformanceHUD } from "./components/PerformanceHUD";
 import { ChatOverlay, type ChatMessage } from "./components/ChatOverlay";
+import { recordMatchResult, getPersistentPlayerId } from "./services/leaderboardService";
 
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
@@ -251,11 +252,34 @@ function App() {
     return () => clearInterval(interval);
   }, [connected]);
 
-  // Sonido y notificación Sileo al finalizar ronda
+  // Sonido, notificación Sileo y registro en el tablón de clasificación al finalizar ronda
   const prevWinnerNotified = useRef<string | null>(null);
+  const recordedRoundRef = useRef<boolean>(false);
+
   useEffect(() => {
     if (!connected) return;
     if (gameStatus === "ROUND_OVER") {
+      if (!recordedRoundRef.current) {
+        recordedRoundRef.current = true;
+        const myP = myPlayer();
+        if (myP) {
+          const myId = myP.id;
+          const isWin = winnerId === myId;
+          const nickname = myP.getState("name") || myP.getProfile()?.name || "Jugador";
+          const skin = myP.getState("skin") || "robot";
+          const color = myP.getState("color") || myP.getProfile()?.color?.hex || "#38bdf8";
+
+          recordMatchResult({
+            playerId: getPersistentPlayerId(),
+            nickname,
+            skin,
+            color,
+            scoreGained: isWin ? GLOBAL_SCORE_PER_WIN : 1, // 10 puntos por victoria, 1 punto por participar
+            isWin,
+          });
+        }
+      }
+
       const myId = myPlayer()?.id;
       if (winnerId === myId && winnerId !== null) {
         playWinSound();
@@ -274,6 +298,7 @@ function App() {
       }
     } else if (gameStatus === "PLAYING") {
       prevWinnerNotified.current = null;
+      recordedRoundRef.current = false;
     }
   }, [gameStatus, winnerId, connected, players]);
 
