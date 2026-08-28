@@ -1,0 +1,10 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permitir lectura y escritura en la colección de clasificaciones
+    match /leaderboard_players/{playerId} {
+      allow read, write: if true;
+    }
+  }
+}

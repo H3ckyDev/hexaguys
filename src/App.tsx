@@ -10,6 +10,7 @@ import { LandingPage } from "./components/LandingPage";
 import { playWinSound, playFallSound, playStepSound, playChatSound, setGlobalVolume, getGlobalVolume } from "./utils/sounds";
 import { PerformanceHUD } from "./components/PerformanceHUD";
 import { ChatOverlay, type ChatMessage } from "./components/ChatOverlay";
+import { recordMatchResult, getPersistentPlayerId } from "./services/leaderboardService";
 
 const keyboardMap = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
@@ -251,11 +252,60 @@ function App() {
     return () => clearInterval(interval);
   }, [connected]);
 
-  // Sonido y notificación Sileo al finalizar ronda
+  // Sonido, notificación Sileo y registro en el tablón de clasificación al finalizar ronda
   const prevWinnerNotified = useRef<string | null>(null);
+  const recordedRoundRef = useRef<boolean>(false);
+  const roundStartScoreRef = useRef<number>(0);
+
   useEffect(() => {
     if (!connected) return;
+
+    // Al iniciar el conteo de la ronda, capturar la puntuación base de inicio
+    if (gameStatus === "COUNTDOWN") {
+      roundStartScoreRef.current = myPlayer()?.getState("globalScore") || 0;
+      recordedRoundRef.current = false;
+      prevWinnerNotified.current = null;
+    }
+
     if (gameStatus === "ROUND_OVER") {
+      if (!recordedRoundRef.current) {
+        recordedRoundRef.current = true;
+        const myP = myPlayer();
+        if (myP) {
+          const myId = myP.id;
+          const isWin = winnerId === myId;
+          const nickname = myP.getState("name") || myP.getProfile()?.name || "Jugador";
+          const skin = myP.getState("skin") || "robot";
+          const avatar = myP.getState("avatar");
+          const color = myP.getState("color") || myP.getProfile()?.color?.hex || "#38bdf8";
+          
+          // Puntos ganados durante esta ronda específica (supervivencia + victoria)
+          const currentTotalScore = myP.getState("globalScore") || 0;
+          let scoreGained = Math.max(0, currentTotalScore - roundStartScoreRef.current);
+          if (isWin && scoreGained < GLOBAL_SCORE_PER_WIN) {
+            scoreGained = GLOBAL_SCORE_PER_WIN;
+          }
+
+          console.log("[Leaderboard] Inserción de estadísticas al finalizar partida:", {
+            nickname,
+            skin,
+            avatar,
+            scoreGained,
+            isWin,
+          });
+
+          recordMatchResult({
+            playerId: getPersistentPlayerId(),
+            nickname,
+            skin,
+            avatar,
+            color,
+            scoreGained,
+            isWin,
+          });
+        }
+      }
+
       const myId = myPlayer()?.id;
       if (winnerId === myId && winnerId !== null) {
         playWinSound();
@@ -461,6 +511,7 @@ function App() {
       senderName: player.getState("name") || player.getProfile()?.name || "Jugador",
       senderColor: player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8",
       senderSkin: player.getState("skin") || "robot",
+      senderAvatar: player.getState("avatar"),
       text: text.slice(0, 120),
       timestamp: Date.now(),
     };

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { playStepSound } from "../utils/sounds";
 import { ChatIcon, SendIcon, CloseIcon } from "./Icons";
+import { CyberAvatar } from "./CyberAvatar";
 
 export interface ChatMessage {
   id: string;
@@ -8,6 +9,7 @@ export interface ChatMessage {
   senderName: string;
   senderColor: string;
   senderSkin?: string;
+  senderAvatar?: string;
   text: string;
   timestamp: number;
 }
@@ -119,12 +121,12 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId, isMobile =
       {/* Ventana de Chat Expandida */}
       {isOpen && (
         <div className="w-72 sm:w-80 md:w-96 rounded-3xl p-4 sm:p-5 mb-2.5 flex flex-col gap-3 bg-[#0f152b] border border-[#243464] shadow-[0_20px_50px_rgba(0,0,0,0.8)] pointer-events-auto animate-in slide-in-from-bottom duration-150">
-          {/* Encabezado */}
-          <div className="flex justify-between items-center pb-2.5 border-b border-[#1b2548]">
+          {/* Cabecera */}
+          <div className="flex justify-between items-center pb-2 border-b border-[#1b2548]">
             <div className="flex items-center gap-2">
-              <ChatIcon className="w-4.5 h-4.5 text-cyan-400" />
-              <span className="text-sm font-black text-white uppercase tracking-wider font-mono">
-                CHAT EN VIVO ({messages.length})
+              <ChatIcon className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-mono uppercase font-black tracking-wider text-white">
+                CANAL DE VOZ & CHAT
               </span>
             </div>
             <button
@@ -151,26 +153,36 @@ export function ChatOverlay({ messages, onSendMessage, localPlayerId, isMobile =
                 return (
                   <div
                     key={msg.id}
-                    className={`flex flex-col gap-0.5 p-3 rounded-2xl transition-all ${
+                    className={`flex items-start gap-2.5 p-2.5 rounded-2xl transition-all ${
                       isMe
-                        ? "bg-[#142347] border border-blue-500/40 self-end max-w-[88%]"
-                        : "bg-[#0a0f22] border border-[#1f2a50] self-start max-w-[88%]"
+                        ? "bg-[#142347] border border-blue-500/40 self-end max-w-[92%]"
+                        : "bg-[#0a0f22] border border-[#1f2a50] self-start max-w-[92%]"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span
-                        className="font-bold tracking-tight truncate"
-                        style={{ color: msg.senderColor || "#38bdf8" }}
-                      >
-                        {msg.senderName} {isMe && "(Tú)"}
-                      </span>
-                      <span className="text-slate-500 font-mono text-[10px]">
-                        {formatTime(msg.timestamp)}
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                      <CyberAvatar
+                        config={msg.senderAvatar || msg.senderSkin}
+                        seed={msg.senderName}
+                        color={msg.senderColor}
+                        size={24}
+                      />
+                    </div>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span
+                          className="font-bold tracking-tight truncate text-[11px]"
+                          style={{ color: msg.senderColor || "#38bdf8" }}
+                        >
+                          {msg.senderName} {isMe && "(Tú)"}
+                        </span>
+                        <span className="text-slate-500 font-mono text-[9px] shrink-0">
+                          {formatTime(msg.timestamp)}
+                        </span>
+                      </div>
+                      <span className="text-slate-100 text-xs sm:text-sm break-words font-normal mt-0.5">
+                        {msg.text}
                       </span>
                     </div>
-                    <span className="text-slate-100 text-sm break-words font-normal mt-0.5">
-                      {msg.text}
-                    </span>
                   </div>
                 );
               })

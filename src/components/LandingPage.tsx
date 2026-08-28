@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { playStepSound } from "../utils/sounds";
-import { PlayIcon, CloseIcon, FlameIcon, DiamondIcon } from "./Icons";
+import { PlayIcon, CloseIcon, FlameIcon, DiamondIcon, TrophyIcon } from "./Icons";
+import { LeaderboardModal } from "./LeaderboardModal";
 
 interface LandingPageProps {
   onHostGame: () => void;
@@ -12,6 +13,7 @@ interface LandingPageProps {
 export function LandingPage({ onHostGame, onJoinGame, afkKickNotice, onDismissNotice }: LandingPageProps) {
   const [roomInput, setRoomInput] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +57,17 @@ export function LandingPage({ onHostGame, onJoinGame, afkKickNotice, onDismissNo
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              playStepSound();
+              setShowLeaderboard(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#131a33] hover:bg-[#1a2345] border border-amber-500/60 hover:border-amber-400 text-amber-300 hover:text-amber-200 text-sm font-mono font-bold transition-all shadow-[0_0_12px_rgba(245,158,11,0.15)] cursor-pointer active:scale-95"
+          >
+            <TrophyIcon className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline-block">RANKING</span>
+          </button>
+
           <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#11172f] border border-[#243056]">
             <DiamondIcon className="w-4 h-4 text-cyan-400" />
             <span className="text-sm font-mono text-cyan-300 font-bold">TEMPORADA 1</span>
@@ -184,6 +197,12 @@ export function LandingPage({ onHostGame, onJoinGame, afkKickNotice, onDismissNo
       <footer className="w-full max-w-5xl text-center text-sm text-slate-500 py-3 border-t border-[#1b2548] font-mono">
         HexaGuys © {new Date().getFullYear()} • Plataforma 3D Multijugador en Tiempo Real
       </footer>
+
+      {/* Modal de Clasificación */}
+      <LeaderboardModal
+        isOpen={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
+      />
     </div>
   );
 }

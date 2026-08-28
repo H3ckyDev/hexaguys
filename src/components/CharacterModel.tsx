@@ -1,9 +1,11 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { type AvatarConfig, deserializeAvatar } from "../utils/avatarGenerator";
 
 interface CharacterModelProps {
   type: "robot" | "ninja" | "astronaut" | "alien";
+  avatar?: AvatarConfig | string | null;
   color: string;
   isMoving: boolean;
   isGrounded: boolean;
@@ -12,11 +14,16 @@ interface CharacterModelProps {
 
 export function CharacterModel({
   type,
+  avatar,
   color,
   isMoving,
   isGrounded,
   isRunning = false,
 }: CharacterModelProps) {
+  const avatarConfig = typeof avatar === "object" && avatar !== null
+    ? avatar
+    : deserializeAvatar(avatar || type, color);
+
   // Anim refs
   const leftArmRef = useRef<THREE.Group>(null);
   const rightArmRef = useRef<THREE.Group>(null);
@@ -129,92 +136,105 @@ export function CharacterModel({
           {mainMaterial}
         </mesh>
 
-        {/* Robot Visor / Eyes */}
-        {type === "robot" && (
+        {/* Visor / Ojos LED dinámicos según AvatarConfig */}
+        {avatarConfig ? (
           <>
+            {/* Ojos / Visor LED frontal */}
+            <mesh position={[0, 0.06, 0.22]}>
+              <boxGeometry args={[0.3, 0.08, 0.02]} />
+              <meshStandardMaterial
+                color={avatarConfig.eyes === 0 ? "#06b6d4" : avatarConfig.eyes === 1 ? "#10b981" : avatarConfig.eyes === 2 ? "#3b82f6" : avatarConfig.eyes === 3 ? "#ef4444" : avatarConfig.eyes === 4 ? "#f59e0b" : avatarConfig.eyes === 5 ? "#06b6d4" : avatarConfig.eyes === 6 ? "#ec4899" : "#a855f7"}
+                emissive={avatarConfig.eyes === 0 ? "#06b6d4" : avatarConfig.eyes === 1 ? "#10b981" : avatarConfig.eyes === 2 ? "#3b82f6" : avatarConfig.eyes === 3 ? "#ef4444" : avatarConfig.eyes === 4 ? "#f59e0b" : avatarConfig.eyes === 5 ? "#06b6d4" : avatarConfig.eyes === 6 ? "#ec4899" : "#a855f7"}
+                emissiveIntensity={1.2}
+              />
+            </mesh>
+
+            {/* Accesorio 3D 1: Antenas Dobles */}
+            {avatarConfig.accessory === 1 && (
+              <>
+                <mesh position={[-0.12, 0.28, 0]}>
+                  <cylinderGeometry args={[0.015, 0.015, 0.16]} />
+                  <meshStandardMaterial color="#64748b" metalness={0.9} />
+                </mesh>
+                <mesh position={[-0.12, 0.36, 0]}>
+                  <sphereGeometry args={[0.03, 8, 8]} />
+                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={1} />
+                </mesh>
+                <mesh position={[0.12, 0.28, 0]}>
+                  <cylinderGeometry args={[0.015, 0.015, 0.16]} />
+                  <meshStandardMaterial color="#64748b" metalness={0.9} />
+                </mesh>
+                <mesh position={[0.12, 0.36, 0]}>
+                  <sphereGeometry args={[0.03, 8, 8]} />
+                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={1} />
+                </mesh>
+              </>
+            )}
+
+            {/* Accesorio 3D 2: Cuernos Cibernéticos */}
+            {avatarConfig.accessory === 2 && (
+              <>
+                <mesh position={[-0.18, 0.24, 0]} rotation={[0, 0, 0.4]}>
+                  <coneGeometry args={[0.05, 0.15, 8]} />
+                  <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.8} />
+                </mesh>
+                <mesh position={[0.18, 0.24, 0]} rotation={[0, 0, -0.4]}>
+                  <coneGeometry args={[0.05, 0.15, 8]} />
+                  <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.8} />
+                </mesh>
+              </>
+            )}
+
+            {/* Accesorio 3D 3: Auriculares Gamer */}
+            {avatarConfig.accessory === 3 && (
+              <>
+                {/* Diadema */}
+                <mesh position={[0, 0.22, 0]}>
+                  <boxGeometry args={[0.48, 0.04, 0.08]} />
+                  <meshStandardMaterial color="#0f172a" metalness={0.8} />
+                </mesh>
+                {/* Orejeras */}
+                <mesh position={[-0.23, 0.04, 0]}>
+                  <cylinderGeometry args={[0.08, 0.08, 0.05]} />
+                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.8} />
+                </mesh>
+                <mesh position={[0.23, 0.04, 0]}>
+                  <cylinderGeometry args={[0.08, 0.08, 0.05]} />
+                  <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.8} />
+                </mesh>
+              </>
+            )}
+
+            {/* Accesorio 3D 4: Tornillos Laterales */}
+            {avatarConfig.accessory === 4 && (
+              <>
+                <mesh position={[-0.23, 0.04, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.04, 0.04, 0.06]} />
+                  <meshStandardMaterial color="#94a3b8" metalness={0.9} />
+                </mesh>
+                <mesh position={[0.23, 0.04, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.04, 0.04, 0.06]} />
+                  <meshStandardMaterial color="#94a3b8" metalness={0.9} />
+                </mesh>
+              </>
+            )}
+
+            {/* Accesorio 3D 5: Aleta Superior */}
+            {avatarConfig.accessory === 5 && (
+              <mesh position={[0, 0.28, 0]}>
+                <boxGeometry args={[0.04, 0.14, 0.3]} />
+                <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.8} />
+              </mesh>
+            )}
+          </>
+        ) : (
+          /* Fallback por tipo */
+          type === "robot" ? (
             <mesh position={[0, 0.08, 0.22]}>
               <boxGeometry args={[0.3, 0.08, 0.02]} />
               <meshStandardMaterial color="#ec4899" emissive="#ec4899" emissiveIntensity={1} />
             </mesh>
-            {/* Antennas */}
-            <mesh position={[-0.1, 0.26, 0]}>
-              <cylinderGeometry args={[0.02, 0.02, 0.15]} />
-              <meshStandardMaterial color="#64748b" metalness={0.9} />
-            </mesh>
-            <mesh position={[0.1, 0.26, 0]}>
-              <cylinderGeometry args={[0.02, 0.02, 0.15]} />
-              <meshStandardMaterial color="#64748b" metalness={0.9} />
-            </mesh>
-          </>
-        )}
-
-        {/* Ninja Headband */}
-        {type === "ninja" && (
-          <>
-            {/* Front Band */}
-            <mesh position={[0, 0.08, 0]}>
-              <boxGeometry args={[0.44, 0.08, 0.44]} />
-              <meshStandardMaterial color="#ef4444" roughness={0.6} />
-            </mesh>
-            {/* Hanging ties in back */}
-            <mesh position={[0.08, -0.15, -0.22]} rotation={[0, 0, -0.2]}>
-              <boxGeometry args={[0.05, 0.2, 0.01]} />
-              <meshStandardMaterial color="#ef4444" />
-            </mesh>
-            <mesh position={[-0.08, -0.15, -0.22]} rotation={[0, 0, 0.2]}>
-              <boxGeometry args={[0.05, 0.2, 0.01]} />
-              <meshStandardMaterial color="#ef4444" />
-            </mesh>
-          </>
-        )}
-
-        {/* Astronaut Helmet Visor */}
-        {type === "astronaut" && (
-          <mesh position={[0, 0, 0.1]} scale={[1, 0.9, 0.9]}>
-            <sphereGeometry args={[0.22, 16, 16]} />
-            <meshStandardMaterial color="#0f172a" roughness={0.05} metalness={0.9} />
-          </mesh>
-        )}
-
-        {/* Alien 3 Eyes & Antennas */}
-        {type === "alien" && (
-          <>
-            {/* Three Eyes */}
-            <mesh position={[-0.1, 0.06, 0.2]}>
-              <sphereGeometry args={[0.06, 16, 16]} />
-              <meshBasicMaterial color="#ffffff" />
-            </mesh>
-            <mesh position={[0, 0.12, 0.2]}>
-              <sphereGeometry args={[0.06, 16, 16]} />
-              <meshBasicMaterial color="#ffffff" />
-            </mesh>
-            <mesh position={[0.1, 0.06, 0.2]}>
-              <sphereGeometry args={[0.06, 16, 16]} />
-              <meshBasicMaterial color="#ffffff" />
-            </mesh>
-            {/* Pupils */}
-            <mesh position={[-0.1, 0.06, 0.25]}>
-              <sphereGeometry args={[0.025, 8, 8]} />
-              <meshBasicMaterial color="#000000" />
-            </mesh>
-            <mesh position={[0, 0.12, 0.25]}>
-              <sphereGeometry args={[0.025, 8, 8]} />
-              <meshBasicMaterial color="#000000" />
-            </mesh>
-            <mesh position={[0.1, 0.06, 0.25]}>
-              <sphereGeometry args={[0.025, 8, 8]} />
-              <meshBasicMaterial color="#000000" />
-            </mesh>
-            {/* Alien Antennas */}
-            <mesh position={[0, 0.26, 0]}>
-              <cylinderGeometry args={[0.015, 0.015, 0.12]} />
-              <meshStandardMaterial color={color} />
-            </mesh>
-            <mesh position={[0, 0.33, 0]}>
-              <sphereGeometry args={[0.04, 8, 8]} />
-              <meshStandardMaterial color="#ec4899" emissive="#ec4899" />
-            </mesh>
-          </>
+          ) : null
         )}
       </group>
 

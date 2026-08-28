@@ -14,11 +14,28 @@ import {
   GridIcon,
   UserIcon,
   CoinIcon,
-  RobotSkinIcon,
-  NinjaSkinIcon,
-  AstroSkinIcon,
-  AlienSkinIcon,
+  TrophyIcon,
+  DiceIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "./Icons";
+import { LeaderboardModal } from "./LeaderboardModal";
+import { CyberAvatar } from "./CyberAvatar";
+import {
+  type AvatarConfig,
+  generateRandomAvatar,
+  serializeAvatar,
+  deserializeAvatar,
+  normalizeColor,
+  HEAD_NAMES,
+  EYES_NAMES,
+  MOUTH_NAMES,
+  ACCESSORY_NAMES,
+  TOTAL_HEADS,
+  TOTAL_EYES,
+  TOTAL_MOUTHS,
+  TOTAL_ACCESSORIES,
+} from "../utils/avatarGenerator";
 
 interface GameUIProps {
   players: any[];
@@ -48,13 +65,6 @@ const COLOR_PALETTE = [
   { id: "purple", hex: "#9333ea", name: "Púrpura" },
   { id: "teal", hex: "#0d9488", name: "Turquesa" },
   { id: "slate", hex: "#475569", name: "Pizarra" },
-];
-
-const SKINS_LIST = [
-  { id: "robot", name: "Robot", Icon: RobotSkinIcon },
-  { id: "ninja", name: "Ninja", Icon: NinjaSkinIcon },
-  { id: "astronaut", name: "Astronauta", Icon: AstroSkinIcon },
-  { id: "alien", name: "Alien", Icon: AlienSkinIcon },
 ];
 
 const MAPS_LIST = [
@@ -93,15 +103,63 @@ export function GameUI({
   const [showLobbyDrawer, setShowLobbyDrawer] = useState(false);
   const [showEndCustomizer, setShowEndCustomizer] = useState(false);
   const [showPlayersMenu, setShowPlayersMenu] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
-  const currentSkin = localPlayer?.getState("skin") || "robot";
-  const currentColor = localPlayer?.getState("color") || localPlayer?.getProfile()?.color?.hex || COLOR_PALETTE[0].hex;
+  const currentColor = normalizeColor(
+    localPlayer?.getState("color") || localPlayer?.getProfile()?.color || COLOR_PALETTE[0].hex
+  );
+
+  // Estado del Avatar Procedural
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("hexaguys_avatar_config") : null;
+    return deserializeAvatar(saved, currentColor);
+  });
 
   // Apodo
   const [nickname, setNickname] = useState(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("hexaguys_username") : null;
     return saved || localPlayer?.getState("name") || localPlayer?.getProfile()?.name || `Jugador_${Math.floor(Math.random() * 900 + 100)}`;
   });
+
+  const updateAvatar = (newConfig: AvatarConfig) => {
+    setAvatarConfig(newConfig);
+    const serialized = serializeAvatar(newConfig);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("hexaguys_avatar_config", serialized);
+      } catch (e) {
+        console.warn("Error al persistir avatar:", e);
+      }
+    }
+    if (localPlayer) {
+      localPlayer.setState("avatar", serialized);
+    }
+  };
+
+  const handleRandomizeAvatar = () => {
+    playStepSound();
+    const randomConfig = generateRandomAvatar(currentColor);
+    updateAvatar(randomConfig);
+    sileo.success({
+      title: "Rostro Aleatorizado",
+      description: "¡Nuevo avatar generado con éxito!",
+    });
+  };
+
+  const handleStepLayer = (layer: "head" | "eyes" | "mouth" | "accessory", delta: number) => {
+    playStepSound();
+    let total = TOTAL_HEADS;
+    if (layer === "eyes") total = TOTAL_EYES;
+    if (layer === "mouth") total = TOTAL_MOUTHS;
+    if (layer === "accessory") total = TOTAL_ACCESSORIES;
+
+    const currentVal = avatarConfig[layer];
+    const nextVal = (currentVal + delta + total) % total;
+    updateAvatar({
+      ...avatarConfig,
+      [layer]: nextVal,
+    });
+  };
 
   useEffect(() => {
     if (localPlayer) {
@@ -111,12 +169,11 @@ export function GameUI({
       if (!localPlayer.getState("color")) {
         localPlayer.setState("color", currentColor);
       }
-      if (!localPlayer.getState("skin")) {
-        const defaultSkin = host ? "robot" : "ninja";
-        localPlayer.setState("skin", defaultSkin);
+      if (!localPlayer.getState("avatar")) {
+        localPlayer.setState("avatar", serializeAvatar(avatarConfig));
       }
     }
-  }, [localPlayer, host, nickname, currentColor]);
+  }, [localPlayer, nickname, currentColor, avatarConfig]);
 
   const handleCopyLink = async () => {
     const code = getRoomCode() || new URLSearchParams(window.location.search).get("r");
@@ -162,13 +219,7 @@ export function GameUI({
   const handleSelectColor = (hex: string) => {
     if (localPlayer) {
       localPlayer.setState("color", hex);
-      playStepSound();
-    }
-  };
-
-  const handleSelectSkin = (skin: string) => {
-    if (localPlayer) {
-      localPlayer.setState("skin", skin);
+      updateAvatar({ ...avatarConfig, color: hex });
       playStepSound();
     }
   };
@@ -212,8 +263,6 @@ export function GameUI({
     return winner?.getState("color") || winner?.getProfile()?.color?.hex || "#ffffff";
   };
 
-  const CurrentSkinComponent = SKINS_LIST.find((s) => s.id === currentSkin)?.Icon || RobotSkinIcon;
-
   return (
     <div className={`absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-30 select-none font-sans antialiased ${isMobile ? "mobile-game-ui" : ""}`}>
       {/* 1. BARRA SUPERIOR (Cápsulas a la izquierda, Centro despejado para notificaciones, Perfil a la derecha) */}
@@ -249,6 +298,18 @@ export function GameUI({
 
         {/* Lado Derecho: Perfil de Usuario y Acciones Rápidas */}
         <div className="flex items-center gap-2.5">
+          {/* Botón de Tabla de Clasificación / Ranking */}
+          <button
+            onClick={() => {
+              playStepSound();
+              setShowLeaderboard(true);
+            }}
+            className="px-3.5 py-2 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-amber-500/60 hover:border-amber-400 flex items-center gap-2 text-amber-300 hover:text-amber-200 text-xs font-mono font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.15)] active:scale-95"
+            title="Ver Tabla de Clasificación"
+          >
+            <TrophyIcon className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline-block uppercase tracking-wider">RANKING</span>
+          </button>
 
           {/* Botón de Lista de Jugadores */}
           <button
@@ -298,18 +359,19 @@ export function GameUI({
                   const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
                   const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0284c7";
                   const score = p.getState("globalScore") || 0;
-                  const skin = p.getState("skin") || "robot";
-                  const SkinComp = SKINS_LIST.find((s) => s.id === skin)?.Icon || RobotSkinIcon;
+                  const pAvatar = p.getState("avatar") || p.getState("skin");
                   const isAfk = Boolean(p.getState("isAfk"));
 
                   return (
                     <div key={p.id} className="flex justify-between items-center gap-2 pt-2 text-xs">
                       <div className="flex items-center gap-2.5 truncate">
-                        <div
-                          className="w-7 h-7 rounded-xl flex items-center justify-center text-white border border-white/20 shrink-0 shadow-sm"
-                          style={{ backgroundColor: pColor }}
-                        >
-                          <SkinComp className="w-3.5 h-3.5 text-white" />
+                        <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                          <CyberAvatar
+                            config={pAvatar}
+                            seed={pName}
+                            color={pColor}
+                            size={28}
+                          />
                         </div>
 
                         <div className="flex flex-col truncate">
@@ -511,44 +573,55 @@ export function GameUI({
             </button>
 
             {showEndCustomizer && (
-              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col gap-3.5 w-full text-left animate-in fade-in duration-150">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Apodo:</label>
-                  <input
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onKeyUp={(e) => e.stopPropagation()}
-                    onKeyPress={(e) => e.stopPropagation()}
-                    maxLength={15}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0f152b] border border-[#243058] focus:border-cyan-400 focus:outline-none text-white text-xs font-semibold"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Skin:</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {SKINS_LIST.map((s) => {
-                      const Icon = s.Icon;
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => handleSelectSkin(s.id)}
-                          className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
-                            currentSkin === s.id
-                              ? "bg-blue-600/30 border-blue-400 text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]"
-                              : "bg-[#0f152b] border-[#243058] text-slate-400 hover:text-white"
-                          }`}
-                        >
-                          <Icon className="w-4 h-4" />
-                          <span className="text-[9px] font-bold mt-1">{s.name}</span>
-                        </button>
-                      );
-                    })}
+              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col gap-3 w-full text-left animate-in fade-in duration-150">
+                {/* Live Preview y Aleatorizar */}
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 rounded-2xl bg-[#0f1733] border border-cyan-500/50 flex items-center justify-center p-1 shrink-0 shadow-md">
+                    <CyberAvatar config={avatarConfig} color={currentColor} size={54} />
+                  </div>
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <button
+                      onClick={handleRandomizeAvatar}
+                      className="w-full py-1.5 px-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <DiceIcon className="w-3.5 h-3.5" />
+                      <span>🎲 Aleatorizar Cara</span>
+                    </button>
+                    <input
+                      type="text"
+                      value={nickname}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onKeyUp={(e) => e.stopPropagation()}
+                      onKeyPress={(e) => e.stopPropagation()}
+                      maxLength={15}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#0f152b] border border-[#243058] focus:border-cyan-400 focus:outline-none text-white text-xs font-semibold"
+                      placeholder="Tu apodo"
+                    />
                   </div>
                 </div>
 
+                {/* Modificador de Capas */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
+                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{HEAD_NAMES[avatarConfig.head]}</span>
+                    <button onClick={() => handleStepLayer("head", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Casco &gt;</button>
+                  </div>
+                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
+                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{EYES_NAMES[avatarConfig.eyes]}</span>
+                    <button onClick={() => handleStepLayer("eyes", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Ojos &gt;</button>
+                  </div>
+                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
+                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{MOUTH_NAMES[avatarConfig.mouth]}</span>
+                    <button onClick={() => handleStepLayer("mouth", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Boca &gt;</button>
+                  </div>
+                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
+                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{ACCESSORY_NAMES[avatarConfig.accessory]}</span>
+                    <button onClick={() => handleStepLayer("accessory", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Item &gt;</button>
+                  </div>
+                </div>
+
+                {/* Color */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Color:</label>
                   <div className="grid grid-cols-4 gap-1.5">
@@ -691,12 +764,37 @@ export function GameUI({
                 </button>
               </div>
 
-              {/* Pestaña 1: Aspecto y Skin */}
+              {/* Pestaña 1: Aspecto y Personalizador de Avatar */}
               {activeTab === "custom" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-150">
-                  {/* Apodo y Color */}
-                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-3">
-                    <div className="flex flex-col gap-1">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 animate-in fade-in duration-150">
+                  {/* Columna Izquierda: Vista Previa Grande del Avatar, Apodo & Color */}
+                  <div className="md:col-span-5 bg-[#0a0f22] border border-[#1f2a50] p-4 sm:p-5 rounded-2xl flex flex-col items-center gap-3.5">
+                    {/* Live Avatar Preview */}
+                    <div className="relative group">
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-[#0f1733] border-2 border-cyan-500/50 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.25)] p-2">
+                        <CyberAvatar
+                          config={avatarConfig}
+                          color={currentColor}
+                          size={95}
+                          className="transition-transform group-hover:scale-105 duration-200"
+                        />
+                      </div>
+                      <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-cyan-950/90 border border-cyan-400 text-[10px] font-mono font-bold text-cyan-300">
+                        VISTA PREVIA
+                      </span>
+                    </div>
+
+                    {/* Botón Aleatorizar Rostro */}
+                    <button
+                      onClick={handleRandomizeAvatar}
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-400/25 to-amber-500/20 hover:from-amber-500/30 hover:to-amber-400/35 border border-amber-400/60 text-amber-300 hover:text-amber-200 text-xs font-mono font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all active:scale-95 mt-1"
+                    >
+                      <DiceIcon className="w-4 h-4 text-amber-400" />
+                      <span>🎲 ALEATORIZAR CARA</span>
+                    </button>
+
+                    {/* Apodo */}
+                    <div className="w-full flex flex-col gap-1 text-left">
                       <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Apodo del Jugador:</label>
                       <input
                         type="text"
@@ -706,12 +804,13 @@ export function GameUI({
                         onKeyUp={(e) => e.stopPropagation()}
                         onKeyPress={(e) => e.stopPropagation()}
                         maxLength={15}
-                        className="w-full px-3 py-2 rounded-xl bg-[#0f152b] border border-[#243464] focus:border-cyan-400 focus:outline-none text-white text-xs font-bold"
+                        className="w-full px-3 py-2 rounded-xl bg-[#0f152b] border border-[#243464] focus:border-cyan-400 focus:outline-none text-white text-xs font-bold font-mono"
                       />
                     </div>
 
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Color del Traje:</label>
+                    {/* Paleta de Color */}
+                    <div className="w-full flex flex-col gap-1 text-left">
+                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Color Base / Neón:</label>
                       <div className="grid grid-cols-4 gap-1.5">
                         {COLOR_PALETTE.map((c) => (
                           <button
@@ -734,29 +833,103 @@ export function GameUI({
                     </div>
                   </div>
 
-                  {/* Selector de Skins (Estilo Badges de la Imagen) */}
-                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2">
-                    <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Skin de Avatar:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {SKINS_LIST.map((s) => {
-                        const Icon = s.Icon;
-                        return (
-                          <button
-                            key={s.id}
-                            onClick={() => handleSelectSkin(s.id)}
-                            className={`flex items-center gap-2.5 p-3 rounded-2xl border transition-all cursor-pointer active:scale-95 ${
-                              currentSkin === s.id
-                                ? "bg-blue-600/25 border-blue-400 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-                                : "bg-[#0f152b] border-[#1f2a50] text-slate-400 hover:text-white"
-                            }`}
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-[#141b36] border border-[#243464] flex items-center justify-center text-white shrink-0">
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <span className="text-xs font-black uppercase font-mono">{s.name}</span>
-                          </button>
-                        );
-                      })}
+                  {/* Columna Derecha: Selectores de Capas Faciales */}
+                  <div className="md:col-span-7 bg-[#0a0f22] border border-[#1f2a50] p-4 sm:p-5 rounded-2xl flex flex-col justify-between gap-2.5">
+                    <div className="flex justify-between items-center pb-2 border-b border-[#182245]">
+                      <span className="text-xs font-mono uppercase font-black text-white">
+                        MODIFICADOR DE CAPAS
+                      </span>
+                      <span className="text-[10px] font-mono text-cyan-400 font-bold">
+                        100% MODULAR
+                      </span>
+                    </div>
+
+                    {/* 1. Casco / Base */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                      <div className="flex flex-col text-left">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">1. Casco / Base</span>
+                        <span className="text-xs font-bold text-white font-mono">{HEAD_NAMES[avatarConfig.head]}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStepLayer("head", -1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronLeftIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleStepLayer("head", 1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronRightIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Ojos LED */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                      <div className="flex flex-col text-left">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">2. Ojos / Visor LED</span>
+                        <span className="text-xs font-bold text-white font-mono">{EYES_NAMES[avatarConfig.eyes]}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStepLayer("eyes", -1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronLeftIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleStepLayer("eyes", 1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronRightIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 3. Boca / Sensor */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                      <div className="flex flex-col text-left">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">3. Boca / Rejilla</span>
+                        <span className="text-xs font-bold text-white font-mono">{MOUTH_NAMES[avatarConfig.mouth]}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStepLayer("mouth", -1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronLeftIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleStepLayer("mouth", 1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronRightIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 4. Accesorios */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                      <div className="flex flex-col text-left">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">4. Accesorio / Antenas</span>
+                        <span className="text-xs font-bold text-white font-mono">{ACCESSORY_NAMES[avatarConfig.accessory]}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStepLayer("accessory", -1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronLeftIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleStepLayer("accessory", 1)}
+                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                        >
+                          <ChevronRightIcon className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -843,18 +1016,19 @@ export function GameUI({
                     const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
                     const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0284c7";
                     const score = p.getState("globalScore") || 0;
-                    const skin = p.getState("skin") || "robot";
-                    const SkinComp = SKINS_LIST.find((s) => s.id === skin)?.Icon || RobotSkinIcon;
+                    const pAvatar = p.getState("avatar") || p.getState("skin");
                     const isAfk = Boolean(p.getState("isAfk"));
 
                     return (
                       <div key={p.id} className="flex justify-between items-center pt-2 text-xs">
                         <div className="flex items-center gap-2.5 truncate">
-                          <div
-                            className="w-7 h-7 rounded-xl flex items-center justify-center text-white border border-white/20 shrink-0 shadow-sm"
-                            style={{ backgroundColor: pColor }}
-                          >
-                            <SkinComp className="w-3.5 h-3.5 text-white" />
+                          <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                            <CyberAvatar
+                              config={pAvatar}
+                              seed={pName}
+                              color={pColor}
+                              size={28}
+                            />
                           </div>
 
                           <div className="flex flex-col truncate">
@@ -931,6 +1105,13 @@ export function GameUI({
           </div>
         </footer>
       )}
+
+      {/* 5. MODAL DE CLASIFICACIÓN / LEADERBOARD */}
+      <LeaderboardModal
+        isOpen={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
+        currentNickname={nickname}
+      />
     </div>
   );
 }
