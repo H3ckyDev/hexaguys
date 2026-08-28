@@ -276,6 +276,7 @@ function App() {
           const isWin = winnerId === myId;
           const nickname = myP.getState("name") || myP.getProfile()?.name || "Jugador";
           const skin = myP.getState("skin") || "robot";
+          const avatar = myP.getState("avatar");
           const color = myP.getState("color") || myP.getProfile()?.color?.hex || "#38bdf8";
           
           // Puntos ganados durante esta ronda específica (supervivencia + victoria)
@@ -288,6 +289,7 @@ function App() {
           console.log("[Leaderboard] Inserción de estadísticas al finalizar partida:", {
             nickname,
             skin,
+            avatar,
             scoreGained,
             isWin,
           });
@@ -296,6 +298,7 @@ function App() {
             playerId: getPersistentPlayerId(),
             nickname,
             skin,
+            avatar,
             color,
             scoreGained,
             isWin,
@@ -508,6 +511,7 @@ function App() {
       senderName: player.getState("name") || player.getProfile()?.name || "Jugador",
       senderColor: player.getState("color") || player.getProfile()?.color?.hex || "#38bdf8",
       senderSkin: player.getState("skin") || "robot",
+      senderAvatar: player.getState("avatar"),
       text: text.slice(0, 120),
       timestamp: Date.now(),
     };

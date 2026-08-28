@@ -14,6 +14,7 @@ export interface LeaderboardPlayer {
   playerId: string;
   nickname: string;
   skin: string;
+  avatar?: string;
   color: string;
   allTimeScore: number;
   allTimeMatches: number;
@@ -87,6 +88,7 @@ export interface MatchResultPayload {
   playerId: string;
   nickname: string;
   skin: string;
+  avatar?: string;
   color: string;
   scoreGained: number;
   isWin: boolean;
@@ -113,6 +115,7 @@ export async function recordMatchResult(payload: MatchResultPayload): Promise<vo
           playerId: payload.playerId,
           nickname: payload.nickname || prev.nickname,
           skin: payload.skin || prev.skin,
+          avatar: payload.avatar || prev.avatar,
           color: payload.color || prev.color,
           allTimeScore: (prev.allTimeScore || 0) + payload.scoreGained,
           allTimeMatches: (prev.allTimeMatches || 0) + 1,
@@ -132,6 +135,7 @@ export async function recordMatchResult(payload: MatchResultPayload): Promise<vo
           playerId: payload.playerId,
           nickname: payload.nickname || "Jugador",
           skin: payload.skin || "robot",
+          avatar: payload.avatar,
           color: payload.color || "#38bdf8",
           allTimeScore: payload.scoreGained,
           allTimeMatches: 1,
@@ -167,6 +171,7 @@ export async function recordMatchResult(payload: MatchResultPayload): Promise<vo
       ...prev,
       nickname: payload.nickname || prev.nickname,
       skin: payload.skin || prev.skin,
+      avatar: payload.avatar || prev.avatar,
       color: payload.color || prev.color,
       allTimeScore: (prev.allTimeScore || 0) + payload.scoreGained,
       allTimeMatches: (prev.allTimeMatches || 0) + 1,
@@ -186,6 +191,7 @@ export async function recordMatchResult(payload: MatchResultPayload): Promise<vo
       playerId: payload.playerId,
       nickname: payload.nickname || "Jugador",
       skin: payload.skin || "robot",
+      avatar: payload.avatar,
       color: payload.color || "#38bdf8",
       allTimeScore: payload.scoreGained,
       allTimeMatches: 1,
@@ -235,6 +241,7 @@ export async function fetchLeaderboard(
           playerId: d.id || item.playerId || "unknown",
           nickname: item.nickname || "Jugador",
           skin: item.skin || "robot",
+          avatar: item.avatar,
           color: item.color || "#38bdf8",
           allTimeScore: item.allTimeScore || 0,
           allTimeMatches: item.allTimeMatches || 0,

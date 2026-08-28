@@ -547,6 +547,7 @@ export function PlayerBall({
         <group ref={visualRef} visible={shouldBeVisible}>
           <CharacterModel
             type={skinType}
+            avatar={player.getState("avatar")}
             color={playerColor}
             isMoving={isMoving}
             isGrounded={isGrounded}

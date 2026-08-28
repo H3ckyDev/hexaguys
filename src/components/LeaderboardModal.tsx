@@ -16,11 +16,8 @@ import {
   PlayIcon,
   CalendarIcon,
   RefreshIcon,
-  RobotSkinIcon,
-  NinjaSkinIcon,
-  AstroSkinIcon,
-  AlienSkinIcon,
 } from "./Icons";
+import { CyberAvatar } from "./CyberAvatar";
 import { playStepSound } from "../utils/sounds";
 
 interface LeaderboardModalProps {
@@ -71,19 +68,6 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
   if (!isOpen) return null;
 
   const currentSortField = getFieldForQuery(metric, period);
-
-  const getSkinIcon = (skin: string) => {
-    switch (skin) {
-      case "ninja":
-        return NinjaSkinIcon;
-      case "astro":
-        return AstroSkinIcon;
-      case "alien":
-        return AlienSkinIcon;
-      default:
-        return RobotSkinIcon;
-    }
-  };
 
   const top1 = players[0];
   const top2 = players[1];
@@ -278,14 +262,13 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
                     <div className="w-7 h-7 -mt-7 mb-1 rounded-full bg-cyan-500/20 border border-cyan-400 text-cyan-300 flex items-center justify-center text-xs font-black font-mono shadow-md">
                       2
                     </div>
-                    <div
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-white border border-white/20 mb-2 shadow-md"
-                      style={{ backgroundColor: top2.color }}
-                    >
-                      {(() => {
-                        const Icon = getSkinIcon(top2.skin);
-                        return <Icon className="w-6 h-6 text-white" />;
-                      })()}
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-2 shadow-md">
+                      <CyberAvatar
+                        config={top2.avatar || top2.skin}
+                        seed={top2.nickname}
+                        color={top2.color}
+                        size={52}
+                      />
                     </div>
                     <span className="text-xs sm:text-sm font-black text-white truncate max-w-full">
                       {top2.nickname}
@@ -305,14 +288,13 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex items-center justify-center">
                       <CrownIcon className="w-7 h-7 text-amber-400 drop-shadow-[0_0_10px_rgba(245,158,11,0.8)] animate-pulse" />
                     </div>
-                    <div
-                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-white border-2 border-amber-400/80 mb-2 shadow-lg mt-1"
-                      style={{ backgroundColor: top1.color }}
-                    >
-                      {(() => {
-                        const Icon = getSkinIcon(top1.skin);
-                        return <Icon className="w-7 h-7 text-white" />;
-                      })()}
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-2 shadow-lg mt-1">
+                      <CyberAvatar
+                        config={top1.avatar || top1.skin}
+                        seed={top1.nickname}
+                        color={top1.color}
+                        size={64}
+                      />
                     </div>
                     <span className="text-sm sm:text-base font-black text-white truncate max-w-full">
                       {top1.nickname}
@@ -332,14 +314,13 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
                     <div className="w-7 h-7 -mt-7 mb-1 rounded-full bg-amber-600/20 border border-amber-500 text-amber-400 flex items-center justify-center text-xs font-black font-mono shadow-md">
                       3
                     </div>
-                    <div
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-white border border-white/20 mb-2 shadow-md"
-                      style={{ backgroundColor: top3.color }}
-                    >
-                      {(() => {
-                        const Icon = getSkinIcon(top3.skin);
-                        return <Icon className="w-6 h-6 text-white" />;
-                      })()}
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center mb-2 shadow-md">
+                      <CyberAvatar
+                        config={top3.avatar || top3.skin}
+                        seed={top3.nickname}
+                        color={top3.color}
+                        size={52}
+                      />
                     </div>
                     <span className="text-xs sm:text-sm font-black text-white truncate max-w-full">
                       {top3.nickname}
@@ -359,14 +340,12 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-[11px] font-mono uppercase font-bold text-slate-400 px-3 pb-1 border-b border-[#1a254a]">
                     <span># Posición & Jugador</span>
-                    <span>Skin</span>
                     <span>{metric === "score" ? "Puntuación" : "Partidas"}</span>
                   </div>
 
                   {restPlayers.map((player, idx) => {
                     const rank = idx + 4;
                     const isMe = player.playerId === localPlayerId;
-                    const Icon = getSkinIcon(player.skin);
 
                     return (
                       <div
@@ -381,20 +360,18 @@ export function LeaderboardModal({ isOpen, onClose, currentNickname }: Leaderboa
                           <span className="text-xs font-mono font-bold text-slate-400 w-5 text-left">
                             #{rank}
                           </span>
-                          <div
-                            className="w-7 h-7 rounded-xl flex items-center justify-center text-white border border-white/20 shadow-sm"
-                            style={{ backgroundColor: player.color }}
-                          >
-                            <Icon className="w-4 h-4 text-white" />
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center">
+                            <CyberAvatar
+                              config={player.avatar || player.skin}
+                              seed={player.nickname}
+                              color={player.color}
+                              size={32}
+                            />
                           </div>
                           <span className="text-sm font-black text-white truncate max-w-[140px] sm:max-w-[200px]">
                             {player.nickname} {isMe && "(Tú)"}
                           </span>
                         </div>
-
-                        <span className="text-xs text-slate-400 capitalize font-mono hidden sm:inline-block">
-                          {player.skin}
-                        </span>
 
                         <span className="text-sm font-mono font-bold text-white">
                           {player[currentSortField]}{" "}
