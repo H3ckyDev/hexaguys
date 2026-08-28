@@ -11,10 +11,7 @@ interface CardboardBoxLobbyProps {
  * Ubicada de forma independiente y aislada de las torres hexagonales de juego.
  */
 export function CardboardBoxLobby({ position = [60, 0, 0], gameStatus }: CardboardBoxLobbyProps) {
-  // Desactivar completamente la caja y sus 4 luces durante la partida para maximizar 60 FPS
-  if (gameStatus === "PLAYING" || gameStatus === "COUNTDOWN") {
-    return null;
-  }
+  const isLobby = gameStatus === "LOBBY" || gameStatus === "ROUND_OVER" || !gameStatus;
 
   const [posX, posY, posZ] = position;
   const boxWidth = 14; // Ancho en eje X
@@ -34,11 +31,15 @@ export function CardboardBoxLobby({ position = [60, 0, 0], gameStatus }: Cardboa
 
   return (
     <>
-      {/* 1. ILUMINACIÓN DIRECTA DENTRO DE LA CAJA */}
-      <directionalLight position={[posX + 5, posY + 18, posZ + 8]} intensity={2.5} color="#ffffff" />
-      <pointLight position={[posX, posY + 3.8, posZ]} intensity={2.8} distance={25} color="#fff3db" />
-      <pointLight position={[posX - 4, posY + 3.0, posZ - 4]} intensity={1.8} distance={16} color="#ffe8c2" />
-      <pointLight position={[posX + 4, posY + 3.0, posZ + 4]} intensity={1.8} distance={16} color="#ffe8c2" />
+      {/* 1. ILUMINACIÓN DIRECTA DENTRO DE LA CAJA (Solo activa cuando se está en el Lobby para 60fps) */}
+      {isLobby && (
+        <group>
+          <directionalLight position={[posX + 5, posY + 18, posZ + 8]} intensity={2.5} color="#ffffff" />
+          <pointLight position={[posX, posY + 3.8, posZ]} intensity={2.8} distance={25} color="#fff3db" />
+          <pointLight position={[posX - 4, posY + 3.0, posZ - 4]} intensity={1.8} distance={16} color="#ffe8c2" />
+          <pointLight position={[posX + 4, posY + 3.0, posZ + 4]} intensity={1.8} distance={16} color="#ffe8c2" />
+        </group>
+      )}
 
       {/* 2. PISO SÓLIDO DE CARTÓN CON COLISIONADOR DIRECTO EN COORDENADAS MUNDIALES */}
       <RigidBody

@@ -94,10 +94,6 @@ function HexTileComponent({ id, position, floor, steppedAt, onStep, gameStatus }
     }
   });
 
-  if (isBroken && posY <= -20) {
-    return null; // Don't render if fallen too deep
-  }
-
   const FLOOR_COLORS = [
     "#38bdf8", // Sky Blue
     "#818cf8", // Indigo
@@ -124,25 +120,6 @@ function HexTileComponent({ id, position, floor, steppedAt, onStep, gameStatus }
     }
   }
 
-  if (isBroken) {
-    return (
-      <mesh
-        position={[position[0], posY, position[2]]}
-        scale={[1, scaleY, 1]}
-        rotation={[0, Math.PI / 6, 0]}
-      >
-        <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.3}
-          metalness={0.1}
-          emissive="#e11d48"
-          emissiveIntensity={0.5}
-        />
-      </mesh>
-    );
-  }
-
   const handleTrigger = (event: any) => {
     const otherNode = event.other.rigidBodyObject;
     if (otherNode && otherNode.userData && otherNode.userData.type === "player") {
@@ -157,21 +134,29 @@ function HexTileComponent({ id, position, floor, steppedAt, onStep, gameStatus }
     <RigidBody
       type="fixed"
       colliders="hull"
-      position={[position[0], position[1], position[2]]}
+      position={[position[0], isBroken ? -100 : position[1], position[2]]}
       friction={0}
       restitution={0}
       onCollisionEnter={handleTrigger}
     >
-      <mesh scale={[1, scaleY, 1]} rotation={[0, Math.PI / 6, 0]} receiveShadow>
-        <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.3}
-          metalness={0.1}
-          emissive={steppedAt !== null ? "#e11d48" : "#000000"}
-          emissiveIntensity={steppedAt !== null ? 0.5 : 0}
-        />
-      </mesh>
+      {/* Mesh visual animado: se muestra mientras no haya caído al abismo */}
+      {posY > -20 && (
+        <mesh
+          position={[0, isBroken ? posY - position[1] : 0, 0]}
+          scale={[1, scaleY, 1]}
+          rotation={[0, Math.PI / 6, 0]}
+          receiveShadow={!isBroken}
+        >
+          <cylinderGeometry args={[HEX_RADIUS * 1.0, HEX_RADIUS * 1.0, 0.4, 6]} />
+          <meshStandardMaterial
+            color={color}
+            roughness={0.3}
+            metalness={0.1}
+            emissive={steppedAt !== null ? "#e11d48" : "#000000"}
+            emissiveIntensity={steppedAt !== null ? 0.5 : 0}
+          />
+        </mesh>
+      )}
     </RigidBody>
   );
 }
@@ -188,19 +173,12 @@ interface HexGridProps {
 
 export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatus }: HexGridProps) {
   const [tiles, setTiles] = useState<any[]>([]);
-  const isLobby = gameStatus === "LOBBY" || gameStatus === "ROUND_OVER";
   const isCountdown = gameStatus === "COUNTDOWN";
   const floorDistance = 4.5;
   const topFloorY = (floorsCount - 1) * floorDistance;
 
   useEffect(() => {
-    // Si estamos en el Lobby o Fin de Ronda (Caja de Cartón), no se renderizan las baldosas de la torre de juego
-    if (isLobby) {
-      setTiles([]);
-      return;
-    }
-
-    // Generar la torre completa de baldosas de forma estable y persistente (evita recrear colisionadores entre Countdown y Playing)
+    // Generar la torre completa de baldosas de forma estable y persistente (evita recrear colisionadores entre estados)
     const list: any[] = [];
     const rad = mapId === "tower" ? 3 : 4; // 37 baldosas para tower, 61 para classic
     const numFloors = Math.max(2, Math.min(8, floorsCount));
@@ -220,7 +198,7 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
     }
 
     setTiles(list);
-  }, [mapId, floorsCount, isLobby, floorDistance]);
+  }, [mapId, floorsCount, floorDistance]);
 
   // 6 muros de protección perimetrales durante el COUNTDOWN de 5s para evitar caídas previas
   const countdownWalls = [0, 1, 2, 3, 4, 5].map((i) => {
@@ -235,11 +213,9 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
     };
   });
 
-  if (isLobby) return null;
-
   return (
     <group>
-      {/* Baldosas hexagonales del juego */}
+      {/* Baldosas hexagonales del juego (siempre montadas de forma estable) */}
       {tiles.map((tile) => (
         <HexTile
           key={tile.id}
@@ -252,18 +228,18 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
         />
       ))}
 
-      {/* Muros de protección holográfica durante la cuenta regresiva */}
-      {isCountdown && (
-        <group>
-          {countdownWalls.map((w) => (
-            <RigidBody
-              key={w.id}
-              type="fixed"
-              position={w.position}
-              rotation={w.rotation}
-              friction={0}
-              restitution={0.2}
-            >
+      {/* Muros de protección persistentes: se teletransportan a Y=-100 cuando no es COUNTDOWN */}
+      {countdownWalls.map((w) => (
+        <RigidBody
+          key={w.id}
+          type="fixed"
+          position={[w.position[0], isCountdown ? w.position[1] : -100, w.position[2]]}
+          rotation={w.rotation}
+          friction={0}
+          restitution={0.2}
+        >
+          {isCountdown && (
+            <group>
               {/* Cristal de energía */}
               <mesh castShadow receiveShadow>
                 <boxGeometry args={[7.8, 3.2, 0.3]} />
@@ -287,10 +263,10 @@ export function HexGrid({ brokenTiles, onStep, mapId, floorsCount = 3, gameStatu
                   roughness={0.2}
                 />
               </mesh>
-            </RigidBody>
-          ))}
-        </group>
-      )}
+            </group>
+          )}
+        </RigidBody>
+      ))}
     </group>
   );
 }
