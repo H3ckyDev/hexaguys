@@ -4,6 +4,11 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
+  increment,
+  query,
+  orderBy,
+  limit
 } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "./firebase";
 
@@ -49,12 +54,14 @@ export function getPersistentPlayerId(): string {
   try {
     let id = localStorage.getItem(PLAYER_ID_STORAGE_KEY);
     if (!id) {
-      id = "p_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now().toString(36);
+      const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9) + "_" + Date.now().toString(36);
+      id = "p_" + randomPart;
       localStorage.setItem(PLAYER_ID_STORAGE_KEY, id);
     }
     return id;
   } catch {
-    return "p_guest_" + Date.now().toString(36);
+    const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
+    return "p_guest_" + randomPart;
   }
 }
 
@@ -105,33 +112,47 @@ export async function recordMatchResult(payload: MatchResultPayload): Promise<vo
       const docRef = doc(db, "leaderboard_players", payload.playerId);
       const docSnap = await getDoc(docRef);
 
-      let data: LeaderboardPlayer;
       if (docSnap.exists()) {
         const prev = docSnap.data() as LeaderboardPlayer;
         const isNewWeek = prev.lastWeekKey !== currentWeek;
         const isNewMonth = prev.lastMonthKey !== currentMonth;
 
-        data = {
-          playerId: payload.playerId,
+        const updateData: any = {
           nickname: payload.nickname || prev.nickname,
           skin: payload.skin || prev.skin,
           avatar: payload.avatar || prev.avatar,
           color: payload.color || prev.color,
-          allTimeScore: (prev.allTimeScore || 0) + payload.scoreGained,
-          allTimeMatches: (prev.allTimeMatches || 0) + 1,
-          allTimeWins: (prev.allTimeWins || 0) + (payload.isWin ? 1 : 0),
-          weeklyScore: (isNewWeek ? 0 : prev.weeklyScore || 0) + payload.scoreGained,
-          weeklyMatches: (isNewWeek ? 0 : prev.weeklyMatches || 0) + 1,
-          weeklyWins: (isNewWeek ? 0 : prev.weeklyWins || 0) + (payload.isWin ? 1 : 0),
-          monthlyScore: (isNewMonth ? 0 : prev.monthlyScore || 0) + payload.scoreGained,
-          monthlyMatches: (isNewMonth ? 0 : prev.monthlyMatches || 0) + 1,
-          monthlyWins: (isNewMonth ? 0 : prev.monthlyWins || 0) + (payload.isWin ? 1 : 0),
+          allTimeScore: increment(payload.scoreGained),
+          allTimeMatches: increment(1),
+          allTimeWins: increment(payload.isWin ? 1 : 0),
           lastWeekKey: currentWeek,
           lastMonthKey: currentMonth,
           updatedAt: now,
         };
+
+        if (isNewWeek) {
+          updateData.weeklyScore = payload.scoreGained;
+          updateData.weeklyMatches = 1;
+          updateData.weeklyWins = payload.isWin ? 1 : 0;
+        } else {
+          updateData.weeklyScore = increment(payload.scoreGained);
+          updateData.weeklyMatches = increment(1);
+          updateData.weeklyWins = increment(payload.isWin ? 1 : 0);
+        }
+
+        if (isNewMonth) {
+          updateData.monthlyScore = payload.scoreGained;
+          updateData.monthlyMatches = 1;
+          updateData.monthlyWins = payload.isWin ? 1 : 0;
+        } else {
+          updateData.monthlyScore = increment(payload.scoreGained);
+          updateData.monthlyMatches = increment(1);
+          updateData.monthlyWins = increment(payload.isWin ? 1 : 0);
+        }
+
+        await updateDoc(docRef, updateData);
       } else {
-        data = {
+        const data: LeaderboardPlayer = {
           playerId: payload.playerId,
           nickname: payload.nickname || "Jugador",
           skin: payload.skin || "robot",
@@ -150,9 +171,8 @@ export async function recordMatchResult(payload: MatchResultPayload): Promise<vo
           lastMonthKey: currentMonth,
           updatedAt: now,
         };
+        await setDoc(docRef, data);
       }
-
-      await setDoc(docRef, data, { merge: true });
     } catch (error) {
       console.warn("[Leaderboard] Error saving match to Firebase, using local fallback:", error);
     }
@@ -233,7 +253,12 @@ export async function fetchLeaderboard(
 
   if (isFirebaseConfigured && db) {
     try {
-      const snap = await getDocs(collection(db, "leaderboard_players"));
+      const q = query(
+        collection(db, "leaderboard_players"),
+        orderBy(sortField, "desc"),
+        limit(50)
+      );
+      const snap = await getDocs(q);
       const results: LeaderboardPlayer[] = [];
       snap.forEach((d) => {
         const item = d.data() as Partial<LeaderboardPlayer>;
@@ -259,8 +284,7 @@ export async function fetchLeaderboard(
         results.push(playerItem);
       });
 
-      console.log(`[Leaderboard] Obtenidos ${results.length} jugadores de Firestore (${metric} / ${period}):`, results);
-      return results.sort((a, b) => Number(b[sortField] || 0) - Number(a[sortField] || 0)).slice(0, 50);
+      return results;
     } catch (error) {
       console.warn("[Leaderboard] Error al consultar Firestore, usando datos locales:", error);
     }
