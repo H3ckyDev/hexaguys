@@ -94,7 +94,6 @@ export function GameUI({
   isMobile = false,
 }: GameUIProps) {
   const alivePlayers = players.filter((p) => p.getState("isAlive") !== false);
-  const activePlayers = players.filter((p) => !p.getState("isAfk"));
   const host = isHost();
   const localPlayer = myPlayer();
 
@@ -1000,28 +999,20 @@ export function GameUI({
             <div className="flex flex-col items-center justify-center gap-2.5 w-full max-w-xs sm:max-w-sm mx-auto">
               {/* 1. Botón Principal de Partida */}
               {host ? (
-                activePlayers.length >= 2 ? (
-                  <button
-                    onClick={() => {
-                      if (document.activeElement instanceof HTMLElement) {
-                        document.activeElement.blur();
-                      }
-                      onStartGame();
-                    }}
-                    className="btn-esports-primary w-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2.5 cursor-pointer shadow-[0_0_20px_rgba(0,240,255,0.35)]"
-                  >
-                    <PlayIcon className="w-4 h-4 fill-current" />
-                    <span>INICIAR PARTIDA</span>
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    className="w-full py-2.5 text-xs font-bold text-slate-500 bg-[#070a14] border border-white/10 flex items-center justify-center gap-2 cursor-not-allowed font-mono"
-                    title="Se requieren al menos 2 jugadores activos"
-                  >
-                    <span>MÍNIMO 2 JUGADORES ({activePlayers.length}/2)</span>
-                  </button>
-                )
+                <button
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) {
+                      document.activeElement.blur();
+                    }
+                    onStartGame();
+                  }}
+                  className="btn-esports-primary w-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2.5 cursor-pointer shadow-[0_0_20px_rgba(0,240,255,0.35)]"
+                >
+                  <PlayIcon className="w-4 h-4 fill-current" />
+                  <span>
+                    {players.length > 1 ? `INICIAR PARTIDA (${players.length} JUGADORES)` : "INICIAR PARTIDA"}
+                  </span>
+                </button>
               ) : (
                 <div className="w-full py-2.5 bg-[#070a14] border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold flex items-center justify-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />

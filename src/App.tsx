@@ -384,21 +384,12 @@ function App() {
 
     const timer = setInterval(() => {
       const status = getState("status") || "LOBBY";
-      const activePlayers = players.filter((p) => !p.getState("isAfk"));
 
-      // A. Contador de 5 segundos (se cancela si quedan menos de 2 jugadores activos)
+      // A. Contador de 5 segundos hacia el inicio de la ronda
       if (status === "COUNTDOWN") {
-        if (activePlayers.length < 2) {
+        if (players.length < 1) {
           setState("status", "LOBBY");
           setState("countdown", 5);
-          RPC.call("chatMessage", {
-            id: `msg_cancel_${Date.now()}`,
-            senderId: "system",
-            senderName: "Sistema",
-            senderColor: "#f59e0b",
-            text: "⚠️ Inicio cancelado: se requieren mínimo 2 jugadores activos (no AFK).",
-            timestamp: Date.now(),
-          }, RPC.Mode.ALL);
           return;
         }
 
@@ -486,18 +477,20 @@ function App() {
     return () => clearInterval(timer);
   }, [connected, players]);
 
-  // Iniciar / reiniciar partida (Solo Anfitrión con mínimo 2 jugadores no AFK)
+  // Iniciar / reiniciar partida (Solo Anfitrión)
   const handleStartGame = () => {
     if (!isHost()) return;
 
-    const activePlayers = players.filter((p) => !p.getState("isAfk"));
-    if (activePlayers.length < 2) {
+    if (players.length < 1) {
       return;
     }
 
-    // Restablecer estados de vida y motivos de muerte
+    playStepSound();
+
+    // Restablecer estados de vida, inactividad y movimiento para todos los jugadores
     players.forEach((p) => {
       p.setState("isAlive", true);
+      p.setState("isAfk", false);
       p.setState("deathReason", null);
       p.setState("isMoving", false);
       p.setState("isRunning", false);
