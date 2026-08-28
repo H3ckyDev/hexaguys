@@ -330,11 +330,23 @@ function App() {
           // Empate: Todos cayeron al mismo tiempo
           setState("status", "ROUND_OVER");
           setState("winnerId", null);
+          players.forEach((p) => {
+            p.setState("isAlive", true);
+            p.setState("deathReason", null);
+            p.setState("isMoving", false);
+            p.setState("isRunning", false);
+          });
         } else if (alive.length === 1 && players.length > 1) {
           // Ganador en multijugador
           const winner = alive[0];
           setState("status", "ROUND_OVER");
           setState("winnerId", winner.id);
+          players.forEach((p) => {
+            p.setState("isAlive", true);
+            p.setState("deathReason", null);
+            p.setState("isMoving", false);
+            p.setState("isRunning", false);
+          });
           winner.setState(
             "globalScore",
             (winner.getState("globalScore") || 0) + GLOBAL_SCORE_PER_WIN,
@@ -348,6 +360,12 @@ function App() {
           // Muerte en modo individual
           setState("status", "ROUND_OVER");
           setState("winnerId", null);
+          players.forEach((p) => {
+            p.setState("isAlive", true);
+            p.setState("deathReason", null);
+            p.setState("isMoving", false);
+            p.setState("isRunning", false);
+          });
         }
       }
     }, 1000);

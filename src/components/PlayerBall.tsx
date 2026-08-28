@@ -61,6 +61,7 @@ export function PlayerBall({
   const smoothCamTarget = useRef(new THREE.Vector3(spawnX, spawnY, spawnZ));
   const prevGameStatusRef = useRef(gameStatus);
   const isInitialMountRef = useRef(true);
+  const instantSnapCamRef = useRef(true);
   const [, getKeys] = useKeyboardControls();
   const [lastJumpTime, setLastJumpTime] = useState(0);
   const [isGrounded, setIsGrounded] = useState(true);
@@ -158,6 +159,7 @@ export function PlayerBall({
 
     // A. Transición hacia el Lobby (Caja de Cartón en X=60)
     if (isLobbyNow) {
+      instantSnapCamRef.current = true;
       smoothCamTarget.current.set(lobbySpawnX, lobbySpawnY, lobbySpawnZ);
       player.setState("pos", { x: lobbySpawnX, y: lobbySpawnY, z: lobbySpawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });
@@ -175,6 +177,7 @@ export function PlayerBall({
 
     // B. Transición hacia la Partida (Cima de la Torre Hexagonal en X=0)
     if (!isLobbyNow) {
+      instantSnapCamRef.current = true;
       smoothCamTarget.current.set(matchSpawnX, matchSpawnY, matchSpawnZ);
       player.setState("pos", { x: matchSpawnX, y: matchSpawnY, z: matchSpawnZ });
       player.setState("vel", { x: 0, y: 0, z: 0 });
@@ -377,7 +380,7 @@ export function PlayerBall({
           player.setState("isMoving", false);
           player.setState("vel", { x: 0, y: 0, z: 0 });
           rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
-          rbRef.current.setTranslation({ x: 0, y: -20, z: 0 }, true);
+          rbRef.current.setTranslation({ x: 0, y: -25, z: 0 }, true);
           playFallSound();
         } else {
           // Sincronizar posición y velocidad
@@ -385,23 +388,44 @@ export function PlayerBall({
           player.setState("vel", { x: vx, y: vy, z: vz });
         }
 
-        // Seguimiento de cámara estabilizada en tercera persona
-        smoothCamTarget.current.lerp(
-          new THREE.Vector3(translation.x, translation.y, translation.z),
-          0.08
-        );
-
-        state.camera.position.set(
-          smoothCamTarget.current.x,
-          smoothCamTarget.current.y + 6.8,
-          smoothCamTarget.current.z + 8.8
-        );
-        state.camera.lookAt(
-          smoothCamTarget.current.x,
-          smoothCamTarget.current.y + 0.5,
-          smoothCamTarget.current.z
-        );
+        // Seguimiento de cámara en tercera persona con anclaje instantáneo al reaparecer
+        if (instantSnapCamRef.current) {
+          smoothCamTarget.current.set(translation.x, translation.y, translation.z);
+          state.camera.position.set(
+            translation.x,
+            translation.y + 6.8,
+            translation.z + 8.8
+          );
+          state.camera.lookAt(
+            translation.x,
+            translation.y + 0.5,
+            translation.z
+          );
+          instantSnapCamRef.current = false;
+        } else {
+          smoothCamTarget.current.lerp(
+            new THREE.Vector3(translation.x, translation.y, translation.z),
+            0.08
+          );
+          state.camera.position.set(
+            smoothCamTarget.current.x,
+            smoothCamTarget.current.y + 6.8,
+            smoothCamTarget.current.z + 8.8
+          );
+          state.camera.lookAt(
+            smoothCamTarget.current.x,
+            smoothCamTarget.current.y + 0.5,
+            smoothCamTarget.current.z
+          );
+        }
       } else {
+        // Congelar cuerpo físico mientras está caído / espectando
+        if (rbRef.current) {
+          rbRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          rbRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          rbRef.current.setTranslation({ x: 0, y: -25, z: 0 }, true);
+        }
+
         const defaultCamCenter = isLobbyMode
           ? new THREE.Vector3(lobbySpawnX, lobbySpawnY, lobbySpawnZ)
           : new THREE.Vector3(0, topFloorY / 2, 0);
@@ -437,15 +461,21 @@ export function PlayerBall({
       }
 
       if (netPos && rbRef.current) {
-        const nextX = THREE.MathUtils.lerp(rbRef.current.translation().x, netPos.x, 0.25);
-        const nextY = THREE.MathUtils.lerp(rbRef.current.translation().y, netPos.y, 0.25);
-        const nextZ = THREE.MathUtils.lerp(rbRef.current.translation().z, netPos.z, 0.25);
-        
-        rbRef.current.setNextKinematicTranslation({
-          x: nextX,
-          y: nextY,
-          z: nextZ,
-        });
+        const currentY = rbRef.current.translation().y;
+        // Si el jugador remoto estaba en el abismo (-50), teletransportarlo al instante sin lerp
+        if (currentY < -15) {
+          rbRef.current.setTranslation(netPos, true);
+        } else {
+          const nextX = THREE.MathUtils.lerp(rbRef.current.translation().x, netPos.x, 0.25);
+          const nextY = THREE.MathUtils.lerp(currentY, netPos.y, 0.25);
+          const nextZ = THREE.MathUtils.lerp(rbRef.current.translation().z, netPos.z, 0.25);
+          
+          rbRef.current.setNextKinematicTranslation({
+            x: nextX,
+            y: nextY,
+            z: nextZ,
+          });
+        }
 
         // Estado de suelo para jugadores remotos
         setIsGrounded(netVel ? Math.abs(netVel.y) < 0.35 : true);
@@ -461,7 +491,7 @@ export function PlayerBall({
   });
 
   const isAlive = player.getState("isAlive") !== false;
-  const shouldBeVisible = isAlive && (gameStatus !== "ROUND_OVER" || Boolean(scoreNotification));
+  const shouldBeVisible = isAlive;
 
   useEffect(() => {
     const interval = setInterval(() => {
