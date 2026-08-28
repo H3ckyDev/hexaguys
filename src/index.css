@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
 * {
-      font-family: "Outfit", sans-serif !important;
+  font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+::selection {
+  background: rgba(0, 240, 255, 0.35);
+  color: #ffffff;
 }
 
 @layer base {
@@ -15,11 +20,11 @@
     min-height: 100dvh;
     overflow: hidden;
     user-select: none;
-    background-color: #090d1a; /* Deep Cyber Navy Canvas */
-    color: #f1f5f9; /* Slate 100 */
+    background-color: #04060a; /* Obsidian OLED Base */
+    color: #f1f5f9;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
 
   canvas {
@@ -29,164 +34,306 @@
     touch-action: none;
   }
 
+  /* Keycaps Tácticos Cuadrados de Grado Esports */
   kbd {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.2rem 0.45rem;
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: #93c5fd;
-    background-color: #0d1326;
-    border: 1px solid #243056;
-    border-bottom: 2px solid #3b82f6;
-    border-radius: 0.375rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-weight: 800;
+    line-height: 1;
+    color: #e2e8f0;
+    background: #0d111c;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 2px solid rgba(0, 240, 255, 0.6);
+    border-radius: 0.25rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+    transition: all 0.1s ease;
+  }
+
+  kbd:active {
+    transform: translateY(1px);
+    border-bottom-width: 1px;
   }
 }
 
-
-/* Cyber Gaming Dashboard Design System (Tokens de la imagen de referencia) */
-
-/* Paneles y Superficies Principales */
-.game-panel,
-.hg-panel,
-.app-card,
-.ios-card {
-  background: #0f152b; /* Deep Navy Surface */
-  border: 1px solid #1f2a52;
-  box-shadow: 
-    0 20px 40px -10px rgba(0, 0, 0, 0.7),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+/* Números Tabulares para Marcadores y Relojes */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
-.game-card-elevated,
-.hg-panel-elevated,
-.app-card-elevated,
-.ios-card-elevated {
-  background: #151d3b; /* Elevated Navy */
-  border: 1px solid #283769;
-  box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.5);
+/* Físicas de Resorte de Alto Rendimiento */
+.transition-spring {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.game-pill,
-.hg-pill,
-.app-pill,
-.ios-pill {
-  background: #11172f;
-  border: 1px solid #23305a;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+.transition-spring-fast {
+  transition: all 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Cápsulas de Cabecera con Bordes de Color (Como en la referencia) */
-.game-pill-orange {
-  background: #131a33;
-  border: 1px solid #f97316;
-  box-shadow: 0 0 14px rgba(249, 115, 22, 0.2);
+/* ═══════════════════════════════════════════════════════════════
+   PANELES Y ESTRUCTURAS ESPORTS OBSIDIAN STEALTH
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Fondo de Cuadrícula Táctica Milimétrica */
+.tactical-grid-bg {
+  background-color: #04060a;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
-.game-pill-blue {
-  background: #131a33;
-  border: 1px solid #3b82f6;
-  box-shadow: 0 0 14px rgba(59, 130, 246, 0.25);
+/* Panel Stealth con Borde de Precisión 1px */
+.stealth-panel {
+  background: #090c15;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  border-radius: 0.5rem;
+  position: relative;
 }
 
-.game-pill-cyan {
-  background: #11172f;
-  border: 1px solid #06b6d4;
-  box-shadow: 0 0 14px rgba(6, 182, 212, 0.25);
+.stealth-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.4), transparent);
 }
 
-/* Botón de Acción Estilo Play / Launch de la Referencia */
-.game-btn-play,
-.hg-btn-primary,
-.app-btn-primary,
-.ios-btn-primary {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  border: 1px solid #60a5fa;
-  color: #ffffff;
-  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45);
+/* Panel con Cortes a 45° (Chamfer Táctico) */
+.stealth-chamfer {
+  background: #090c15;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+  clip-path: polygon(
+    14px 0%, calc(100% - 14px) 0%, 
+    100% 14px, 100% calc(100% - 14px), 
+    calc(100% - 14px) 100%, 14px 100%, 
+    0% calc(100% - 14px), 0% 14px
+  );
+}
+
+/* Celda de Contención Cyber-Forge para el Avatar */
+.cyber-containment {
+  background: radial-gradient(circle at 50% 40%, #0e1424 0%, #070a13 85%);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8), 0 10px 30px rgba(0, 0, 0, 0.7);
+  position: relative;
+}
+
+.cyber-containment::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: radial-gradient(circle, #00f0ff 0%, transparent 100%);
+  box-shadow: 0 0 15px #00f0ff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOTONES DE GRADO ESPORTS DE ALTO RENDIMIENTO
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Botón Principal: Cian Eléctrico / Azul de Combate */
+.btn-esports-primary {
+  position: relative;
+  background: linear-gradient(135deg, #00f0ff 0%, #0070f3 100%);
+  color: #030611;
+  font-weight: 900;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #70f7ff;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.35), 0 4px 12px rgba(0, 0, 0, 0.6);
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.game-btn-play:hover,
-.hg-btn-primary:hover,
-.app-btn-primary:hover,
-.ios-btn-primary:hover {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
-  transform: scale(1.02);
-}
-.game-btn-play:active,
-.hg-btn-primary:active,
-.app-btn-primary:active,
-.ios-btn-primary:active {
-  transform: scale(0.98);
-  background: #1e40af;
+  overflow: hidden;
 }
 
-.game-btn-secondary,
-.hg-btn-secondary,
-.app-btn-secondary,
-.ios-btn-secondary {
-  background: #131a33;
-  border: 1px solid #263461;
+.btn-esports-primary:hover {
+  background: linear-gradient(135deg, #38f9d7 0%, #00f0ff 100%);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.6), 0 6px 16px rgba(0, 0, 0, 0.8);
+  transform: translateY(-1px);
+}
+
+.btn-esports-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+/* Botón Carmesí de Acción Crítica / Salida */
+.btn-esports-danger {
+  background: linear-gradient(135deg, #ff3366 0%, #c20e3a 100%);
+  color: #ffffff;
+  font-weight: 800;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #ff7597;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 15px rgba(255, 51, 102, 0.3), 0 4px 12px rgba(0, 0, 0, 0.6);
+  transition: all 0.15s ease;
+}
+
+.btn-esports-danger:hover {
+  background: linear-gradient(135deg, #ff527b 0%, #e01145 100%);
+  box-shadow: 0 0 25px rgba(255, 51, 102, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-esports-danger:active {
+  transform: translateY(1px);
+}
+
+/* Botón Oro de Victoria / Ranking */
+.btn-esports-gold {
+  background: linear-gradient(135deg, #ffd000 0%, #d97706 100%);
+  color: #04060a;
+  font-weight: 900;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #ffe66d;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 20px rgba(255, 208, 0, 0.35);
+  transition: all 0.15s ease;
+}
+
+.btn-esports-gold:hover {
+  background: linear-gradient(135deg, #ffe043 0%, #f59e0b 100%);
+  box-shadow: 0 0 30px rgba(255, 208, 0, 0.6);
+  transform: translateY(-1px);
+}
+
+/* Botón Ghost Táctico de Titanio */
+.btn-esports-ghost {
+  background: #0b0f1a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #cbd5e1;
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.game-btn-secondary:hover,
-.hg-btn-secondary:hover,
-.app-btn-secondary:hover,
-.ios-btn-secondary:hover {
-  background: #1a2345;
-  border-color: #3b82f6;
-  color: #ffffff;
-}
-.game-btn-secondary:active,
-.hg-btn-secondary:active,
-.app-btn-secondary:active,
-.ios-btn-secondary:active {
-  transform: scale(0.98);
-  background: #0f152b;
+  font-weight: 700;
+  border-radius: 0.35rem;
+  transition: all 0.15s ease;
 }
 
-/* Tarjetas de Selección Activas */
-.game-chip,
-.hg-chip,
-.app-chip,
-.ios-chip {
-  background: #121933;
-  border: 1px solid #202b52;
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.game-chip:hover,
-.hg-chip:hover,
-.app-chip:hover,
-.ios-chip:hover {
-  background: #172042;
-  border-color: #3b82f6;
-}
-.game-chip-active,
-.hg-chip-active,
-.app-chip-active,
-.ios-chip-active {
-  background: #15224d;
-  border: 1.5px solid #3b82f6;
-  box-shadow: 0 0 16px rgba(59, 130, 246, 0.3);
+.btn-esports-ghost:hover {
+  background: #111728;
+  border-color: rgba(0, 240, 255, 0.6);
   color: #ffffff;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
 }
 
-/* Scrollbar Minimalista Dark */
+.btn-esports-ghost:active {
+  transform: translateY(1px);
+  background: #080c14;
+}
+
+/* Pestaña / Tab Táctica */
+.btn-esports-tab {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 0.25rem;
+  transition: all 0.12s ease;
+  cursor: pointer;
+}
+
+.btn-esports-tab-active {
+  background: #00f0ff;
+  color: #030611;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+}
+
+.btn-esports-tab-inactive {
+  background: transparent;
+  color: #94a3b8;
+}
+
+.btn-esports-tab-inactive:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TELEMETRÍA Y DETALLES TÉCNICOS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Visor HUD Superior */
+.visor-hud {
+  background: #070a12;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 2px solid #00f0ff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 240, 255, 0.1);
+  border-radius: 0.35rem;
+}
+
+/* Chips y Etiquetas Técnicas */
+.tech-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.2rem;
+  background: rgba(0, 240, 255, 0.1);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+/* Micro-indicador LED de Estado */
+.led-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.led-indicator-pulse {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* Animación de Dados */
+@keyframes dice-shake {
+  0% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-18deg) scale(1.15); }
+  40% { transform: rotate(18deg) scale(1.15); }
+  60% { transform: rotate(-12deg) scale(1.08); }
+  80% { transform: rotate(12deg) scale(1.08); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+.animate-dice-shake {
+  animation: dice-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Scrollbar Táctica Dark */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #090d1a;
+  background: #04060a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #253360;
-  border-radius: 9999px;
+  background: #192238;
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
+  background: #00f0ff;
 }

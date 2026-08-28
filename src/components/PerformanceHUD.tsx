@@ -34,10 +34,10 @@ export function PerformanceHUD({ showFps = true }: PerformanceHUDProps) {
 
   return (
     <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 pointer-events-none select-none">
-      <div className="px-3.5 py-1.5 rounded-2xl bg-[#0f152b] border border-[#243464] text-xs flex items-center gap-2 text-slate-300 shadow-[0_4px_14px_rgba(0,0,0,0.5)]">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] inline-block" />
-        <span className="text-[10px] font-mono font-black text-slate-400 uppercase tracking-wider">FPS</span>
-        <span className="font-mono text-xs text-white font-bold">{fps}</span>
+      <div className="px-2.5 py-1 bg-[#060912]/90 border border-white/10 text-xs flex items-center gap-2 text-slate-300 shadow-md">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] inline-block" />
+        <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">FPS</span>
+        <span className="font-mono text-xs text-white font-bold tabular-nums">{fps}</span>
       </div>
     </div>
   );

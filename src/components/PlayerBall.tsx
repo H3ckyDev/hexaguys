@@ -2,8 +2,10 @@ import { useRef, useState, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { RigidBody, RapierRigidBody, CapsuleCollider } from "@react-three/rapier";
 import { useKeyboardControls, Html } from "@react-three/drei";
+import { isHost, RPC } from "playroomkit";
 import { CharacterModel } from "./CharacterModel";
 import { playJumpSound, playFallSound, playScoreNotificationSound } from "../utils/sounds";
+import { worldToHex, isHexInGrid } from "./HexGrid";
 import { sileo } from "sileo";
 import * as THREE from "three";
 
@@ -21,7 +23,9 @@ interface PlayerBallProps {
   isLocal: boolean;
   gameStatus: string;
   floorsCount?: number;
+  mapId?: string;
   isMobile?: boolean;
+  onStepTile?: (id: string) => void;
 }
 
 export function PlayerBall({
@@ -31,7 +35,9 @@ export function PlayerBall({
   isLocal,
   gameStatus,
   floorsCount = 3,
+  mapId = "classic",
   isMobile = false,
+  onStepTile,
 }: PlayerBallProps) {
   const rbRef = useRef<RapierRigidBody>(null);
   const visualRef = useRef<THREE.Group>(null);
@@ -49,7 +55,7 @@ export function PlayerBall({
   // 2. Posición en la cima de la Torre Hexagonal
   const topFloorY = (floorsCount - 1) * 4.5;
   const matchSpawnX = Math.cos(angle) * spawnDist;
-  const matchSpawnY = topFloorY + 1.8;
+  const matchSpawnY = topFloorY + 1.2;
   const matchSpawnZ = Math.sin(angle) * spawnDist;
 
   // Determinar posición según el estado actual (Lobby y Fin de Ronda en la Caja de Cartón)
@@ -331,6 +337,9 @@ export function PlayerBall({
           setLastJumpTime(Date.now());
           touchJump.current = false;
           playJumpSound();
+        } else if (vy > 8.0) {
+          // Prevenir impulsos físicos anómalos por desmonte de colisionadores que eleven al jugador
+          vy = 8.0;
         }
 
         // Aplicar vector de velocidad con frenado instantáneo al soltar teclas
@@ -386,6 +395,45 @@ export function PlayerBall({
           // Sincronizar posición y velocidad
           player.setState("pos", { x: translation.x, y: translation.y, z: translation.z });
           player.setState("vel", { x: vx, y: vy, z: vz });
+
+          // Detección proactiva calibrada de baldosas bajo los pies
+          if (gameStatus === "PLAYING" && (grounded || Math.abs(linvel.y) < 1.6)) {
+            const numFloors = Math.max(2, Math.min(8, floorsCount));
+            const floorDistance = 4.5;
+            for (let f = 0; f < numFloors; f++) {
+              const floorY = (numFloors - 1 - f) * floorDistance;
+              if (translation.y >= floorY - 0.4 && translation.y <= floorY + 1.2) {
+                const horizontalSpeed = Math.hypot(vx, vz);
+                const isStationary = horizontalSpeed < 0.5;
+
+                // Al desplazarse rápido: huella pura en el centro exacto para no activar baldosas laterales
+                // En reposo / AFK: micro-muestreo (±0.12) para que los bordes no se queden flotando
+                const footOffsets = isStationary
+                  ? [
+                      { dx: 0, dz: 0 },
+                      { dx: 0.12, dz: 0 },
+                      { dx: -0.12, dz: 0 },
+                      { dx: 0, dz: 0.12 },
+                      { dx: 0, dz: -0.12 },
+                    ]
+                  : [{ dx: 0, dz: 0 }];
+
+                const checkedTiles = new Set<string>();
+                for (const off of footOffsets) {
+                  const { q, r } = worldToHex(translation.x + off.dx, translation.z + off.dz);
+                  if (isHexInGrid(q, r, mapId)) {
+                    const tileId = `tile_${f}_${q}_${r}`;
+                    if (!checkedTiles.has(tileId)) {
+                      checkedTiles.add(tileId);
+                      onStepTile?.(tileId);
+                      RPC.call("stepOnTile", tileId, RPC.Mode.HOST);
+                    }
+                  }
+                }
+                break;
+              }
+            }
+          }
         }
 
         // Seguimiento de cámara en tercera persona con anclaje instantáneo al reaparecer
@@ -452,6 +500,42 @@ export function PlayerBall({
 
       setIsMoving(netMoving);
       setIsRunning(netRunning);
+
+      // Detección proactiva en el Host para jugadores remotos (AFK / bordes)
+      if (isHost() && isAlive && gameStatus === "PLAYING" && netPos) {
+        const numFloors = Math.max(2, Math.min(8, floorsCount));
+        const floorDistance = 4.5;
+        for (let f = 0; f < numFloors; f++) {
+          const floorY = (numFloors - 1 - f) * floorDistance;
+          if (netPos.y >= floorY - 0.4 && netPos.y <= floorY + 1.2) {
+            const remoteSpeed = netVel ? Math.hypot(netVel.x, netVel.z) : 0;
+            const isStationary = remoteSpeed < 0.5;
+            const footOffsets = isStationary
+              ? [
+                  { dx: 0, dz: 0 },
+                  { dx: 0.12, dz: 0 },
+                  { dx: -0.12, dz: 0 },
+                  { dx: 0, dz: 0.12 },
+                  { dx: 0, dz: -0.12 },
+                ]
+              : [{ dx: 0, dz: 0 }];
+
+            const checkedTiles = new Set<string>();
+            for (const off of footOffsets) {
+              const { q, r } = worldToHex(netPos.x + off.dx, netPos.z + off.dz);
+              if (isHexInGrid(q, r, mapId)) {
+                const tileId = `tile_${f}_${q}_${r}`;
+                if (!checkedTiles.has(tileId)) {
+                  checkedTiles.add(tileId);
+                  onStepTile?.(tileId);
+                  RPC.call("stepOnTile", tileId, RPC.Mode.HOST);
+                }
+              }
+            }
+            break;
+          }
+        }
+      }
 
       if (!isAlive) {
         if (rbRef.current) {

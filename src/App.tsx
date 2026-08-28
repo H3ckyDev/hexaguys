@@ -8,6 +8,7 @@ import { GameScene } from "./components/GameScene";
 import { GameUI } from "./components/GameUI";
 import { LandingPage } from "./components/LandingPage";
 import { playWinSound, playFallSound, playStepSound, playChatSound, setGlobalVolume, getGlobalVolume } from "./utils/sounds";
+import { startBgm, stopBgm, setBgmState, setBgmVolume } from "./utils/bgm";
 import { PerformanceHUD } from "./components/PerformanceHUD";
 import { ChatOverlay, type ChatMessage } from "./components/ChatOverlay";
 import { recordMatchResult, getPersistentPlayerId } from "./services/leaderboardService";
@@ -241,16 +242,54 @@ function App() {
     if (!connected) return;
 
     const interval = setInterval(() => {
-      setGameStatus(getState("status") || "LOBBY");
-      setCountdown(getState("countdown") ?? 5);
-      setWinnerId(getState("winnerId") || null);
-      setBrokenTiles(getState("brokenTiles") || {});
-      setMapId(getState("mapId") || "classic");
-      setFloorsCount(getState("floorsCount") ?? 3);
+      const nextStatus = getState("status") || "LOBBY";
+      const nextCountdown = getState("countdown") ?? 5;
+      const nextWinnerId = getState("winnerId") || null;
+      const nextMapId = getState("mapId") || "classic";
+      const nextFloorsCount = getState("floorsCount") ?? 3;
+      const nextBroken = getState("brokenTiles") || {};
+
+      setGameStatus((prev) => (prev !== nextStatus ? nextStatus : prev));
+      setCountdown((prev) => (prev !== nextCountdown ? nextCountdown : prev));
+      setWinnerId((prev) => (prev !== nextWinnerId ? nextWinnerId : prev));
+      setMapId((prev) => (prev !== nextMapId ? nextMapId : prev));
+      setFloorsCount((prev) => (prev !== nextFloorsCount ? nextFloorsCount : prev));
+
+      setBrokenTiles((prev) => {
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(nextBroken);
+        if (prevKeys.length === nextKeys.length && prevKeys.every((k) => prev[k] === nextBroken[k])) {
+          return prev;
+        }
+        return nextBroken;
+      });
     }, 66);
 
     return () => clearInterval(interval);
   }, [connected]);
+
+  // Ciclo de vida y transición adaptativa de la música de fondo chill (BGM)
+  useEffect(() => {
+    if (!isInGame) {
+      stopBgm();
+      return;
+    }
+
+    startBgm(gameStatus);
+    setBgmState(gameStatus);
+
+    const handleFirstInteraction = () => {
+      startBgm(gameStatus);
+    };
+
+    window.addEventListener("pointerdown", handleFirstInteraction, { once: true });
+    window.addEventListener("keydown", handleFirstInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", handleFirstInteraction);
+      window.removeEventListener("keydown", handleFirstInteraction);
+    };
+  }, [isInGame, gameStatus]);
 
   // Sonido, notificación Sileo y registro en el tablón de clasificación al finalizar ronda
   const prevWinnerNotified = useRef<string | null>(null);
@@ -345,21 +384,12 @@ function App() {
 
     const timer = setInterval(() => {
       const status = getState("status") || "LOBBY";
-      const activePlayers = players.filter((p) => !p.getState("isAfk"));
 
-      // A. Contador de 5 segundos (se cancela si quedan menos de 2 jugadores activos)
+      // A. Contador de 5 segundos hacia el inicio de la ronda
       if (status === "COUNTDOWN") {
-        if (activePlayers.length < 2) {
+        if (players.length < 1) {
           setState("status", "LOBBY");
           setState("countdown", 5);
-          RPC.call("chatMessage", {
-            id: `msg_cancel_${Date.now()}`,
-            senderId: "system",
-            senderName: "Sistema",
-            senderColor: "#f59e0b",
-            text: "⚠️ Inicio cancelado: se requieren mínimo 2 jugadores activos (no AFK).",
-            timestamp: Date.now(),
-          }, RPC.Mode.ALL);
           return;
         }
 
@@ -447,18 +477,20 @@ function App() {
     return () => clearInterval(timer);
   }, [connected, players]);
 
-  // Iniciar / reiniciar partida (Solo Anfitrión con mínimo 2 jugadores no AFK)
+  // Iniciar / reiniciar partida (Solo Anfitrión)
   const handleStartGame = () => {
     if (!isHost()) return;
 
-    const activePlayers = players.filter((p) => !p.getState("isAfk"));
-    if (activePlayers.length < 2) {
+    if (players.length < 1) {
       return;
     }
 
-    // Restablecer estados de vida y motivos de muerte
+    playStepSound();
+
+    // Restablecer estados de vida, inactividad y movimiento para todos los jugadores
     players.forEach((p) => {
       p.setState("isAlive", true);
+      p.setState("isAfk", false);
       p.setState("deathReason", null);
       p.setState("isMoving", false);
       p.setState("isRunning", false);
@@ -491,6 +523,7 @@ function App() {
   const handleVolumeChange = (newVol: number) => {
     setVolume(newVol);
     setGlobalVolume(newVol);
+    setBgmVolume(newVol);
   };
 
   const handleToggleSettings = () => {

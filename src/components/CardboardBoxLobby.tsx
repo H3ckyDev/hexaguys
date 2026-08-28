@@ -1,15 +1,18 @@
-﻿import { RigidBody, CuboidCollider } from "@react-three/rapier";
+import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
 interface CardboardBoxLobbyProps {
   position?: [number, number, number];
+  gameStatus?: string;
 }
 
 /**
  * Sala de Espera (Lobby) 3D en forma de Caja de Cartón
  * Ubicada de forma independiente y aislada de las torres hexagonales de juego.
  */
-export function CardboardBoxLobby({ position = [60, 0, 0] }: CardboardBoxLobbyProps) {
+export function CardboardBoxLobby({ position = [60, 0, 0], gameStatus }: CardboardBoxLobbyProps) {
+  const isLobby = gameStatus === "LOBBY" || gameStatus === "ROUND_OVER" || !gameStatus;
+
   const [posX, posY, posZ] = position;
   const boxWidth = 14; // Ancho en eje X
   const boxLength = 14; // Largo en eje Z
@@ -28,11 +31,15 @@ export function CardboardBoxLobby({ position = [60, 0, 0] }: CardboardBoxLobbyPr
 
   return (
     <>
-      {/* 1. ILUMINACIÓN DIRECTA DENTRO DE LA CAJA */}
-      <directionalLight position={[posX + 5, posY + 18, posZ + 8]} intensity={2.5} color="#ffffff" />
-      <pointLight position={[posX, posY + 3.8, posZ]} intensity={2.8} distance={25} color="#fff3db" />
-      <pointLight position={[posX - 4, posY + 3.0, posZ - 4]} intensity={1.8} distance={16} color="#ffe8c2" />
-      <pointLight position={[posX + 4, posY + 3.0, posZ + 4]} intensity={1.8} distance={16} color="#ffe8c2" />
+      {/* 1. ILUMINACIÓN DIRECTA DENTRO DE LA CAJA (Solo activa cuando se está en el Lobby para 60fps) */}
+      {isLobby && (
+        <group>
+          <directionalLight position={[posX + 5, posY + 18, posZ + 8]} intensity={2.5} color="#ffffff" />
+          <pointLight position={[posX, posY + 3.8, posZ]} intensity={2.8} distance={25} color="#fff3db" />
+          <pointLight position={[posX - 4, posY + 3.0, posZ - 4]} intensity={1.8} distance={16} color="#ffe8c2" />
+          <pointLight position={[posX + 4, posY + 3.0, posZ + 4]} intensity={1.8} distance={16} color="#ffe8c2" />
+        </group>
+      )}
 
       {/* 2. PISO SÓLIDO DE CARTÓN CON COLISIONADOR DIRECTO EN COORDENADAS MUNDIALES */}
       <RigidBody

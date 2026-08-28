@@ -94,14 +94,12 @@ export function GameUI({
   isMobile = false,
 }: GameUIProps) {
   const alivePlayers = players.filter((p) => p.getState("isAlive") !== false);
-  const activePlayers = players.filter((p) => !p.getState("isAfk"));
   const host = isHost();
   const localPlayer = myPlayer();
 
   // Estados de navegación
   const [activeTab, setActiveTab] = useState<"custom" | "match" | "players">("custom");
   const [showLobbyDrawer, setShowLobbyDrawer] = useState(false);
-  const [showEndCustomizer, setShowEndCustomizer] = useState(false);
   const [showPlayersMenu, setShowPlayersMenu] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
@@ -136,10 +134,14 @@ export function GameUI({
     }
   };
 
+  const [isRolling, setIsRolling] = useState(false);
+
   const handleRandomizeAvatar = () => {
     playStepSound();
+    setIsRolling(true);
     const randomConfig = generateRandomAvatar(currentColor);
     updateAvatar(randomConfig);
+    setTimeout(() => setIsRolling(false), 450);
     sileo.success({
       title: "Rostro Aleatorizado",
       description: "¡Nuevo avatar generado con éxito!",
@@ -265,50 +267,53 @@ export function GameUI({
 
   return (
     <div className={`absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-30 select-none font-sans antialiased ${isMobile ? "mobile-game-ui" : ""}`}>
-      {/* 1. BARRA SUPERIOR (Cápsulas a la izquierda, Centro despejado para notificaciones, Perfil a la derecha) */}
+      {/* 1. BARRA SUPERIOR HUD VISOR */}
       <header className="flex justify-between items-center pointer-events-auto gap-3 w-full max-w-6xl mx-auto z-50">
-        {/* Lado Izquierdo: Cápsulas de Estado (Sala, Pisos, Puntos) */}
-        <div className="flex items-center gap-2.5 overflow-x-auto py-1">
-          <div className={isMobile && gameStatus === "LOBBY" ? "flex flex-col items-start gap-1" : "contents"}>
-            {/* Cápsula Naranja: Código de Sala con botón de copiar */}
-            <button
-              onClick={handleCopyLink}
-              className="px-4 py-2 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-orange-500/80 text-sm font-bold text-orange-400 hover:text-orange-300 flex items-center gap-2 shadow-[0_0_12px_rgba(249,115,22,0.25)] transition-all cursor-pointer active:scale-95"
-              title="Copiar código de invitación"
-            >
-              <CopyIcon className="w-4 h-4 text-orange-400" />
-              <span className="font-mono text-sm text-white font-bold">{getRoomCode() || "SALA"}</span>
-              <span className="text-xs text-orange-400/80 uppercase font-bold tracking-wider">Copiar</span>
-            </button>
+        {/* Lado Izquierdo: Código de Sala y Puntuación Tabular */}
+        <div className="flex items-center gap-2 overflow-x-auto py-1">
+          {/* Código de Sala con Botón de Copiar */}
+          <button
+            onClick={handleCopyLink}
+            className="btn-esports-ghost px-3.5 py-2 text-xs font-mono flex items-center gap-2 cursor-pointer"
+            title="Copiar código de invitación"
+          >
+            <CopyIcon className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-white font-black">{getRoomCode() || "SALA"}</span>
+            <span className="text-[10px] text-cyan-300 uppercase tracking-wider hidden sm:inline-block">COPIAR</span>
+          </button>
 
-            {isMobile && gameStatus === "LOBBY" && (
-              <span className="max-w-36 truncate pl-1 text-[11px] font-bold text-white/80">
-                {nickname || "Jugador"}
+          {/* Cápsula Dorada: Puntuación Tabular del Jugador */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#0a0d18] border border-amber-500/40 rounded-[0.25rem]">
+            <CoinIcon className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-mono text-amber-300 font-black tabular-nums">{localPlayer?.getState("globalScore") || 0}</span>
+            <span className="text-[10px] text-amber-400/80 font-mono font-bold">PTS</span>
+          </div>
+
+          {/* Durante la Partida: Indicador Central de Supervivientes */}
+          {gameStatus === "PLAYING" && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#070a14] border border-cyan-500/50 rounded-[0.25rem]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+              <span className="text-xs font-mono text-cyan-300 font-black tabular-nums">
+                {alivePlayers.length} / {players.length}
               </span>
-            )}
-          </div>
-
-          {/* Cápsula Dorada: Puntuación del Jugador */}
-          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#11172f] border border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
-            <CoinIcon className="w-4 h-4 text-amber-400" />
-            <span className="text-sm font-mono text-amber-300 font-black">{localPlayer?.getState("globalScore") || 0}</span>
-            <span className="text-xs text-amber-400/80 font-mono font-bold">PTS</span>
-          </div>
+              <span className="text-[10px] text-slate-400 uppercase font-mono font-bold hidden sm:inline-block">VIVOS</span>
+            </div>
+          )}
         </div>
 
-        {/* Lado Derecho: Perfil de Usuario y Acciones Rápidas */}
-        <div className="flex items-center gap-2.5">
+        {/* Lado Derecho: Ranking, Participantes y Ajustes */}
+        <div className="flex items-center gap-2 relative">
           {/* Botón de Tabla de Clasificación / Ranking */}
           <button
             onClick={() => {
               playStepSound();
               setShowLeaderboard(true);
             }}
-            className="px-3.5 py-2 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-amber-500/60 hover:border-amber-400 flex items-center gap-2 text-amber-300 hover:text-amber-200 text-xs font-mono font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.15)] active:scale-95"
+            className="btn-esports-gold px-3.5 py-2 flex items-center gap-2 text-xs cursor-pointer"
             title="Ver Tabla de Clasificación"
           >
-            <TrophyIcon className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline-block uppercase tracking-wider">RANKING</span>
+            <TrophyIcon className="w-3.5 h-3.5 text-black" />
+            <span className="hidden sm:inline-block font-black">RANKING</span>
           </button>
 
           {/* Botón de Lista de Jugadores */}
@@ -317,11 +322,13 @@ export function GameUI({
               playStepSound();
               setShowPlayersMenu((prev) => !prev);
             }}
-            className="w-10 h-10 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-[#243464] hover:border-blue-500 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer shadow-md relative active:scale-95"
+            className={`btn-esports-ghost w-9 h-9 flex items-center justify-center cursor-pointer relative ${
+              showPlayersMenu ? "border-cyan-400 bg-cyan-950/40 text-white" : ""
+            }`}
             title="Participantes"
           >
-            <UsersIcon className="w-4.5 h-4.5" />
-            <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-mono text-[10px] font-bold border border-[#090d1a]">
+            <UsersIcon className="w-4 h-4 text-cyan-400" />
+            <span className="absolute -top-1 -right-1 px-1 py-0.2 rounded-sm bg-cyan-500 text-black font-mono text-[9px] font-black tabular-nums">
               {players.length}
             </span>
           </button>
@@ -329,88 +336,103 @@ export function GameUI({
           {/* Botón de Ajustes */}
           <button
             onClick={onToggleSettings}
-            className="w-10 h-10 rounded-2xl bg-[#131a33] hover:bg-[#1a2345] border border-[#243464] hover:border-blue-500 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer shadow-md active:scale-95"
+            className="btn-esports-ghost w-9 h-9 flex items-center justify-center cursor-pointer"
             title="Ajustes del sistema"
           >
-            <SettingsIcon className="w-4.5 h-4.5" />
+            <SettingsIcon className="w-4 h-4 text-slate-300" />
           </button>
 
-          {/* Menú Desplegable de Participantes (Estilo Friends / Online Panel de la Referencia) */}
+          {/* Menú Desplegable de Participantes Anclado Directamente */}
           {showPlayersMenu && (
-            <div className="absolute right-3 top-16 bg-[#0f152b] border border-[#243464] p-5 rounded-3xl text-slate-100 min-w-80 max-w-96 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-50 animate-in fade-in duration-150">
-              <div className="flex justify-between items-center pb-2.5 mb-3 border-b border-[#1b2548]">
-                <div className="flex items-center gap-2">
-                  <UsersIcon className="w-4.5 h-4.5 text-cyan-400" />
-                  <span className="text-sm font-mono uppercase font-black text-white">
-                    Participantes ({players.length})
-                  </span>
+            <div className="absolute! right-0 top-full mt-2.5 stealth-panel w-80 sm:w-96 z-50 animate-in fade-in zoom-in-95 duration-150 p-4 shadow-[0_15px_40px_rgba(0,0,0,0.9)]">
+              <div className="flex flex-col gap-3 text-slate-100">
+                <div className="flex justify-between items-center pb-2.5 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <UsersIcon className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-mono uppercase font-black text-white">
+                      PARTICIPANTES ({players.length})
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowPlayersMenu(false)}
+                    className="w-6 h-6 bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-xs cursor-pointer"
+                  >
+                    <CloseIcon className="w-3 h-3" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowPlayersMenu(false)}
-                  className="w-7 h-7 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white text-sm flex items-center justify-center cursor-pointer"
-                >
-                  <CloseIcon className="w-4 h-4" />
-                </button>
-              </div>
 
-              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1 divide-y divide-[#182142]">
-                {players.map((p) => {
-                  const isAlive = p.getState("isAlive") !== false;
-                  const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
-                  const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0284c7";
-                  const score = p.getState("globalScore") || 0;
-                  const pAvatar = p.getState("avatar") || p.getState("skin");
-                  const isAfk = Boolean(p.getState("isAfk"));
+                <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto pr-1">
+                  {players.map((p) => {
+                    const isAlive = p.getState("isAlive") !== false;
+                    const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
+                    const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#00f0ff";
+                    const score = p.getState("globalScore") || 0;
+                    const pAvatar = p.getState("avatar") || p.getState("skin");
+                    const isAfk = Boolean(p.getState("isAfk"));
+                    const isMe = localPlayer && p.id === localPlayer.id;
 
-                  return (
-                    <div key={p.id} className="flex justify-between items-center gap-2 pt-2 text-xs">
-                      <div className="flex items-center gap-2.5 truncate">
-                        <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-                          <CyberAvatar
-                            config={pAvatar}
-                            seed={pName}
-                            color={pColor}
-                            size={28}
-                          />
+                    return (
+                      <div key={p.id} className="flex justify-between items-center gap-2.5 p-2.5 bg-[#060912] border border-white/10 text-xs">
+                        <div className="flex items-center gap-2.5 truncate">
+                          <div className="w-8 h-8 bg-[#090d1a] border border-white/10 flex items-center justify-center shrink-0">
+                            <CyberAvatar
+                              config={pAvatar}
+                              seed={pName}
+                              color={pColor}
+                              size={28}
+                            />
+                          </div>
+
+                          <div className="flex flex-col truncate text-left">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span
+                                className={`truncate font-bold text-xs font-mono ${
+                                  isAlive
+                                    ? isAfk
+                                    ? "text-amber-300"
+                                    : "text-white"
+                                    : "text-slate-500 line-through"
+                                }`}
+                              >
+                                {pName}
+                              </span>
+                              {isMe && (
+                                <span className="text-[9px] font-mono text-cyan-400 font-bold">(Tú)</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[9px] font-mono">
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isAfk ? "bg-amber-400" : "bg-emerald-400"
+                                }`}
+                              />
+                              <span className="text-slate-400">
+                                {isAfk ? "AUSENTE" : "ACTIVO"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="flex flex-col truncate">
-                          <span
-                            className={`truncate font-bold text-xs ${
-                              isAlive
-                                ? isAfk
-                                ? "text-amber-300 font-black"
-                                : "text-white"
-                                : "text-slate-500 line-through"
-                            }`}
-                          >
-                            {pName}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400 font-medium">
-                            {isAfk ? "AUSENTE / AFK" : "ACTIVO"}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {host && localPlayer && p.id !== localPlayer.id && isAfk && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleKickPlayer(p.id, pName);
+                              }}
+                              className="px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[9px] font-mono font-bold cursor-pointer"
+                            >
+                              EXPULSAR
+                            </button>
+                          )}
+                          <span className="text-xs font-mono font-bold text-amber-400 bg-[#0c1020] px-2 py-0.5 border border-white/10 tabular-nums">
+                            {score} PTS
                           </span>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {host && localPlayer && p.id !== localPlayer.id && isAfk && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleKickPlayer(p.id, pName);
-                            }}
-                            className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[10px] font-bold cursor-pointer transition-all"
-                          >
-                            Expulsar
-                          </button>
-                        )}
-                        <span className="text-xs font-mono font-bold text-amber-400 bg-[#141b36] px-2 py-1 rounded-lg border border-[#243464]">
-                          {score} PTS
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -421,48 +443,48 @@ export function GameUI({
       <div className="flex-1 flex items-center justify-center pointer-events-auto my-auto relative z-40">
         {/* Countdown Overlay */}
         {gameStatus === "COUNTDOWN" && (
-          <div className="bg-[#0f152b] border border-cyan-500/60 px-12 py-10 rounded-3xl flex flex-col items-center gap-3 text-white shadow-[0_0_50px_rgba(6,182,212,0.35)] animate-in zoom-in-95 duration-150">
-            <span className="text-sm font-mono font-bold uppercase tracking-widest text-cyan-400">
-              INICIO DE RONDA
+          <div className="stealth-panel p-8 sm:p-10 flex flex-col items-center gap-2 text-white animate-in zoom-in-95 duration-150">
+            <span className="text-xs font-mono font-black uppercase tracking-widest text-cyan-400">
+              PREPARADOS PARA LA CAÍDA
             </span>
-            <div className="text-9xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_25px_rgba(255,255,255,0.7)]">
+            <div className="text-8xl sm:text-9xl font-black font-mono tracking-tight text-white drop-shadow-[0_0_35px_rgba(0,240,255,0.8)] tabular-nums animate-pulse">
               {countdown}
             </div>
-            <span className="text-sm text-slate-300 font-medium">
-              ¡Mantén el balance y no te detengas!
+            <span className="text-xs text-slate-400 font-mono">
+              ¡DOMINA EL SALTO Y NO TE DETENGAS!
             </span>
           </div>
         )}
 
         {/* Modal de Ajustes */}
         {showSettings && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[100] pointer-events-auto p-4 animate-in fade-in duration-150">
-            <div className="bg-[#0f152b] border border-[#243464] p-6 sm:p-7 rounded-3xl flex flex-col gap-5 max-w-sm w-full text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
-              <div className="flex justify-between items-center border-b border-[#1f2a50] pb-3">
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-[100] pointer-events-auto p-4 animate-in fade-in duration-150">
+            <div className="stealth-panel max-w-sm w-full p-6 flex flex-col gap-4 text-slate-100">
+              <div className="flex justify-between items-center border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2">
                   <SettingsIcon className="w-4 h-4 text-cyan-400" />
-                  <h3 className="text-sm font-black tracking-tight text-white uppercase font-mono">
-                    Ajustes del Sistema
+                  <h3 className="text-xs font-black tracking-tight text-white uppercase font-mono">
+                    AJUSTES DEL SISTEMA
                   </h3>
                 </div>
                 <button
                   onClick={onToggleSettings}
-                  className="w-6 h-6 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white text-xs flex items-center justify-center cursor-pointer"
+                  className="w-6 h-6 bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-xs cursor-pointer"
                 >
                   <CloseIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               {/* Slider de Volumen */}
-              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col gap-2">
-                <div className="flex justify-between text-xs font-bold text-slate-200 font-mono">
-                  <span>EFECTOS DE SONIDO</span>
-                  <span className="text-cyan-400">{Math.round(volume * 100)}%</span>
+              <div className="bg-[#050811] border border-white/10 p-3.5 rounded-[0.25rem] flex flex-col gap-2">
+                <div className="flex justify-between text-xs font-black text-slate-200 font-mono">
+                  <span>VOLUMEN // AUDIO & MÚSICA</span>
+                  <span className="text-cyan-400 tabular-nums">{Math.round(volume * 100)}%</span>
                 </div>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-2.5 mt-1">
                   <button
                     onClick={() => handleVolumeBtn(-0.1)}
-                    className="w-8 h-8 rounded-xl bg-[#141c38] hover:bg-[#1b264d] text-xs font-bold text-white flex items-center justify-center cursor-pointer transition-colors"
+                    className="btn-esports-ghost w-7 h-7 text-xs font-bold flex items-center justify-center cursor-pointer"
                   >
                     -
                   </button>
@@ -476,11 +498,11 @@ export function GameUI({
                       onVolumeChange(parseFloat(e.target.value));
                       if (Math.random() < 0.25) playStepSound();
                     }}
-                    className="flex-1 accent-cyan-400 cursor-pointer h-2 bg-[#141c38] rounded-lg appearance-none"
+                    className="flex-1 accent-cyan-400 cursor-pointer h-1.5 bg-[#121c38] rounded appearance-none"
                   />
                   <button
                     onClick={() => handleVolumeBtn(0.1)}
-                    className="w-8 h-8 rounded-xl bg-[#141c38] hover:bg-[#1b264d] text-xs font-bold text-white flex items-center justify-center cursor-pointer transition-colors"
+                    className="btn-esports-ghost w-7 h-7 text-xs font-bold flex items-center justify-center cursor-pointer"
                   >
                     +
                   </button>
@@ -488,23 +510,23 @@ export function GameUI({
               </div>
 
               {/* Toggle de FPS */}
-              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-slate-200 font-mono">CONTADOR DE FPS</span>
-                  <span className="text-[10px] text-slate-500">Muestra la fluidez en pantalla</span>
+              <div className="bg-[#050811] border border-white/10 p-3.5 rounded-[0.25rem] flex justify-between items-center">
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-black text-slate-200 font-mono">CONTADOR DE FPS</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Telemetría en tiempo real</span>
                 </div>
                 <button
                   onClick={() => {
                     onToggleFps();
                     playStepSound();
                   }}
-                  className={`w-12 h-6 rounded-full p-0.5 transition-colors duration-150 cursor-pointer relative ${
+                  className={`w-10 h-5 rounded-sm p-0.5 transition-colors cursor-pointer relative ${
                     showFps ? "bg-cyan-500" : "bg-[#141c38]"
                   }`}
                 >
                   <span
-                    className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-150 block ${
-                      showFps ? "translate-x-6" : "translate-x-0"
+                    className={`w-4 h-4 bg-white shadow-sm transform transition-transform block ${
+                      showFps ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>
@@ -517,184 +539,104 @@ export function GameUI({
                     onToggleSettings();
                     playStepSound();
                   }}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] cursor-pointer"
+                  className="btn-esports-primary w-full py-2.5 text-xs cursor-pointer"
                 >
-                  Guardar y Cerrar
+                  GUARDAR Y VOLVER
                 </button>
                 <button
                   onClick={handleLeaveGame}
-                  className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  className="btn-esports-danger w-full py-2 text-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <LogOutIcon className="w-3.5 h-3.5" />
-                  <span>Salir al Menú Principal</span>
+                  <span>SALIR AL MENÚ PRINCIPAL</span>
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Pantalla de Fin de Ronda (Estilo Podio de Recompensas de la Referencia) */}
+        {/* Pantalla de Fin de Ronda (Estilo Torneo Esports) */}
         {gameStatus === "ROUND_OVER" && !showSettings && (
-          <div className="bg-[#0f152b] border border-amber-500/40 p-6 sm:p-8 rounded-3xl flex flex-col items-center gap-4 max-w-sm w-full text-center animate-in zoom-in-95 duration-150 text-slate-100 shadow-[0_0_50px_rgba(245,158,11,0.2)]">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-              <CrownIcon className="w-7 h-7" />
+          <div className="stealth-panel max-w-sm w-full p-6 sm:p-7 flex flex-col items-center gap-4 text-center text-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(255,208,0,0.4)]">
+              <CrownIcon className="w-6 h-6" />
             </div>
 
             <div>
-              <h3 className="text-xl font-black tracking-tight text-white uppercase font-mono">
-                Ronda Finalizada
+              <h3 className="text-lg font-black uppercase font-mono tracking-tight text-white">
+                RONDA FINALIZADA
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Resultados de la partida</p>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">SOBREVIVIENTE SUPREMO DE LA ARENA</p>
             </div>
 
             {/* Ganador */}
-            <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col items-center gap-1.5 w-full shadow-inner">
-              <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest">
-                GANADOR DE LA RONDA (+20 PTS)
+            <div className="bg-[#050811] border border-amber-500/40 p-4 rounded-[0.25rem] flex flex-col items-center gap-1 w-full">
+              <span className="text-[10px] font-mono font-black text-amber-400 uppercase tracking-widest">
+                CAMPEÓN (+20 PTS)
               </span>
-              <div className="flex items-center gap-2.5 mt-0.5">
+              <div className="flex items-center gap-2 mt-1">
                 <span
-                  className="w-4 h-4 rounded-full border border-white/40 shadow-sm"
+                  className="w-3.5 h-3.5 rounded-full border border-white/60"
                   style={{ backgroundColor: getWinnerColor() }}
                 />
-                <span className="text-lg font-black text-white">{getWinnerName()}</span>
+                <span className="text-base font-black font-mono text-white tracking-tight">{getWinnerName()}</span>
               </div>
             </div>
 
-            {/* Selector Desplegable de Personalización en Fin de Ronda */}
-            <button
-              onClick={() => {
-                setShowEndCustomizer((prev) => !prev);
-                playStepSound();
-              }}
-              className="w-full py-2.5 px-3 rounded-xl bg-[#141b36] hover:bg-[#1c264d] border border-[#263461] text-xs font-bold text-cyan-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <span>{showEndCustomizer ? "Ocultar Aspecto" : "Cambiar Skin o Color"}</span>
-            </button>
-
-            {showEndCustomizer && (
-              <div className="bg-[#0a0f22] border border-[#243058] p-4 rounded-2xl flex flex-col gap-3 w-full text-left animate-in fade-in duration-150">
-                {/* Live Preview y Aleatorizar */}
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 rounded-2xl bg-[#0f1733] border border-cyan-500/50 flex items-center justify-center p-1 shrink-0 shadow-md">
-                    <CyberAvatar config={avatarConfig} color={currentColor} size={54} />
-                  </div>
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <button
-                      onClick={handleRandomizeAvatar}
-                      className="w-full py-1.5 px-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                    >
-                      <DiceIcon className="w-3.5 h-3.5" />
-                      <span>🎲 Aleatorizar Cara</span>
-                    </button>
-                    <input
-                      type="text"
-                      value={nickname}
-                      onChange={(e) => handleNameChange(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      onKeyUp={(e) => e.stopPropagation()}
-                      onKeyPress={(e) => e.stopPropagation()}
-                      maxLength={15}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#0f152b] border border-[#243058] focus:border-cyan-400 focus:outline-none text-white text-xs font-semibold"
-                      placeholder="Tu apodo"
-                    />
-                  </div>
-                </div>
-
-                {/* Modificador de Capas */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
-                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{HEAD_NAMES[avatarConfig.head]}</span>
-                    <button onClick={() => handleStepLayer("head", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Casco &gt;</button>
-                  </div>
-                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
-                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{EYES_NAMES[avatarConfig.eyes]}</span>
-                    <button onClick={() => handleStepLayer("eyes", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Ojos &gt;</button>
-                  </div>
-                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
-                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{MOUTH_NAMES[avatarConfig.mouth]}</span>
-                    <button onClick={() => handleStepLayer("mouth", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Boca &gt;</button>
-                  </div>
-                  <div className="flex items-center justify-between p-1.5 rounded-xl bg-[#0f152b] border border-[#1f2a50]">
-                    <span className="text-[10px] font-mono text-slate-300 truncate max-w-[85px]">{ACCESSORY_NAMES[avatarConfig.accessory]}</span>
-                    <button onClick={() => handleStepLayer("accessory", 1)} className="px-1.5 py-0.5 rounded bg-[#141b36] hover:bg-[#1f2952] text-slate-300 text-[10px] font-bold cursor-pointer">Item &gt;</button>
-                  </div>
-                </div>
-
-                {/* Color */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Color:</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {COLOR_PALETTE.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => handleSelectColor(c.hex)}
-                        className={`h-6 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
-                          currentColor === c.hex
-                            ? "border-2 border-white scale-105 shadow-md"
-                            : "border border-white/20 opacity-70 hover:opacity-100"
-                        }`}
-                        style={{ backgroundColor: c.hex }}
-                        title={c.name}
-                      >
-                        {currentColor === c.hex && (
-                          <CheckIcon className="w-3 h-3 text-white" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Acciones */}
+            {/* Botón Siguiente Ronda para Host / Espera y Acceso al Taller */}
             <div className="w-full flex flex-col gap-2 pt-1">
-              {host && (
-                activePlayers.length >= 2 ? (
-                  <button
-                    onClick={onStartGame}
-                    className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(37,99,235,0.6)] flex items-center justify-center gap-2 cursor-pointer transition-all"
-                  >
-                    <PlayIcon className="w-4 h-4" />
-                    <span>Jugar Siguiente Ronda</span>
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    className="w-full py-3 rounded-2xl text-xs font-bold text-slate-500 bg-[#0a0f22] border border-[#243058] flex items-center justify-center gap-1.5 cursor-not-allowed"
-                  >
-                    Mínimo 2 Jugadores ({activePlayers.length}/2)
-                  </button>
-                )
+              {host ? (
+                <button
+                  onClick={onStartGame}
+                  className="btn-esports-primary w-full py-3 text-xs flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(0,240,255,0.35)]"
+                >
+                  <PlayIcon className="w-4 h-4 fill-current" />
+                  <span>SIGUIENTE RONDA</span>
+                </button>
+              ) : (
+                <div className="px-4 py-2.5 bg-[#070b18] border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold flex items-center justify-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span>ESPERANDO AL ANFITRIÓN...</span>
+                </div>
               )}
 
-              <div className="flex gap-2 w-full">
-                <button
-                  onClick={handleLeaveGame}
-                  className="flex-1 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Salir
-                </button>
-              </div>
+              {/* Botón para abrir el Taller de Personalización / Configuración de Sala */}
+              <button
+                onClick={() => {
+                  playStepSound();
+                  setShowLobbyDrawer((prev) => !prev);
+                }}
+                className="btn-esports-ghost w-full py-2.5 text-xs font-mono flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <SettingsIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{showLobbyDrawer ? "CERRAR TALLER" : "CONFIGURAR SALA // TALLER"}</span>
+              </button>
+
+              <button
+                onClick={handleLeaveGame}
+                className="w-full py-1 text-[11px] text-slate-400 hover:text-rose-400 font-mono transition-colors cursor-pointer"
+              >
+                Salir de la Sala
+              </button>
             </div>
           </div>
         )}
 
         {/* Modo Espectador */}
         {gameStatus === "PLAYING" && !isLocalAlive && !showSettings && (
-          <div className="bg-[#0f152b] border border-rose-500/40 p-6 rounded-3xl flex flex-col items-center gap-3 max-w-xs text-center animate-in zoom-in-95 duration-150 text-slate-100 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
+          <div className="stealth-panel max-w-xs w-full p-5 flex flex-col items-center gap-3 text-center text-slate-100 animate-in zoom-in-95 duration-150">
             <div className="flex flex-col">
               <span className="text-xs font-black text-rose-400 uppercase tracking-widest font-mono">
                 ELIMINADO
               </span>
-              <span className="text-slate-400 text-xs mt-0.5">
+              <span className="text-slate-400 text-xs font-mono mt-0.5">
                 Modo espectador ({alivePlayers.length} en juego)
               </span>
             </div>
 
             <button
               onClick={handleLeaveGame}
-              className="w-full py-2.5 bg-[#141b36] hover:bg-rose-600/30 border border-rose-500/30 text-rose-200 font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="btn-esports-danger w-full py-2 text-xs font-mono cursor-pointer flex items-center justify-center gap-1.5"
             >
               <LogOutIcon className="w-3.5 h-3.5" />
               <span>Salir de la Partida</span>
@@ -703,99 +645,91 @@ export function GameUI({
         )}
       </div>
 
-      {/* 3. LOBBY HUB INFERIOR (Estilo Game Tiles de la Referencia: ROULETTE / CRASH / TOWERS) */}
-      {gameStatus === "LOBBY" && !showSettings && (
-        <footer className="w-full max-w-5xl mx-auto flex flex-col items-center gap-3 z-40 pointer-events-auto">
+      {/* 3. LOBBY HUB & TALLER INFERIOR */}
+      {(gameStatus === "LOBBY" || gameStatus === "ROUND_OVER") && !showSettings && (
+        <footer className="w-full max-w-5xl mx-auto flex flex-col items-center gap-3 z-40 pointer-events-auto overflow-auto">
           {/* Panel Desplegable de Configuración y Personalización */}
           {showLobbyDrawer && (
-            <div className="w-full bg-[#0f152b] border border-[#243464] p-5 sm:p-6 rounded-3xl text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom duration-150 flex flex-col gap-4">
+            <div className="stealth-panel w-full p-5 sm:p-6 text-slate-100 flex flex-col gap-4 animate-in slide-in-from-bottom duration-150">
               {/* Segmented Control Bar */}
-              <div className="flex justify-between items-center pb-2 border-b border-[#1b2548]">
-                <div className="flex p-1 rounded-2xl bg-[#0a0f22] border border-[#1f2a50] gap-1 w-full sm:w-auto">
+              <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                <div className="flex p-1 bg-[#050811] border border-white/10 gap-1 w-full sm:w-auto">
                   <button
                     onClick={() => {
                       setActiveTab("custom");
                       playStepSound();
                     }}
-                    className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      activeTab === "custom"
-                        ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-                        : "text-slate-400 hover:text-slate-200"
+                    className={`btn-esports-tab ${
+                      activeTab === "custom" ? "btn-esports-tab-active" : "btn-esports-tab-inactive"
                     }`}
                   >
-                    <UserIcon className="w-3.5 h-3.5" />
-                    <span>Aspecto</span>
+                    <UserIcon className="w-3.5 h-3.5 inline mr-1" />
+                    <span>ASPECTO</span>
                   </button>
                   <button
                     onClick={() => {
                       setActiveTab("match");
                       playStepSound();
                     }}
-                    className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      activeTab === "match"
-                        ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-                        : "text-slate-400 hover:text-slate-200"
+                    className={`btn-esports-tab ${
+                      activeTab === "match" ? "btn-esports-tab-active" : "btn-esports-tab-inactive"
                     }`}
                   >
-                    <GridIcon className="w-3.5 h-3.5" />
-                    <span>Arena & Pisos</span>
+                    <GridIcon className="w-3.5 h-3.5 inline mr-1" />
+                    <span>ARENA & PISOS</span>
                   </button>
                   <button
                     onClick={() => {
                       setActiveTab("players");
                       playStepSound();
                     }}
-                    className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-black uppercase font-mono tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      activeTab === "players"
-                        ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-                        : "text-slate-400 hover:text-slate-200"
+                    className={`btn-esports-tab ${
+                      activeTab === "players" ? "btn-esports-tab-active" : "btn-esports-tab-inactive"
                     }`}
                   >
-                    <UsersIcon className="w-3.5 h-3.5" />
-                    <span>Jugadores ({players.length})</span>
+                    <UsersIcon className="w-3.5 h-3.5 inline mr-1" />
+                    <span>JUGADORES ({players.length})</span>
                   </button>
                 </div>
 
                 <button
                   onClick={() => setShowLobbyDrawer(false)}
-                  className="w-7 h-7 rounded-xl bg-[#141b36] hover:bg-white/10 text-slate-400 hover:text-white text-xs flex items-center justify-center cursor-pointer ml-2"
+                  className="w-6 h-6 bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-xs cursor-pointer ml-2"
                 >
-                  <CloseIcon className="w-4 h-4" />
+                  <CloseIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               {/* Pestaña 1: Aspecto y Personalizador de Avatar */}
               {activeTab === "custom" && (
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 animate-in fade-in duration-150">
-                  {/* Columna Izquierda: Vista Previa Grande del Avatar, Apodo & Color */}
-                  <div className="md:col-span-5 bg-[#0a0f22] border border-[#1f2a50] p-4 sm:p-5 rounded-2xl flex flex-col items-center gap-3.5">
-                    {/* Live Avatar Preview */}
-                    <div className="relative group">
-                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-[#0f1733] border-2 border-cyan-500/50 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.25)] p-2">
+                  {/* Columna Izquierda: Vista Previa, Apodo & Color */}
+                  <div className="md:col-span-5 bg-[#050811] border border-white/10 p-4 sm:p-5 flex flex-col items-center gap-3.5">
+                    {/* Live Avatar Preview en Cyber-Forge */}
+                    <div className="cyber-containment w-full py-3 flex flex-col items-center justify-center">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center p-1">
                         <CyberAvatar
                           config={avatarConfig}
                           color={currentColor}
-                          size={95}
-                          className="transition-transform group-hover:scale-105 duration-200"
+                          size={85}
                         />
                       </div>
-                      <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-cyan-950/90 border border-cyan-400 text-[10px] font-mono font-bold text-cyan-300">
-                        VISTA PREVIA
-                      </span>
                     </div>
 
                     {/* Botón Aleatorizar Rostro */}
                     <button
                       onClick={handleRandomizeAvatar}
-                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-400/25 to-amber-500/20 hover:from-amber-500/30 hover:to-amber-400/35 border border-amber-400/60 text-amber-300 hover:text-amber-200 text-xs font-mono font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.2)] transition-all active:scale-95 mt-1"
+                      className={`btn-esports-gold w-full py-2 px-3 text-xs flex items-center justify-center gap-2 cursor-pointer ${
+                        isRolling ? "animate-dice-shake" : ""
+                      }`}
                     >
-                      <DiceIcon className="w-4 h-4 text-amber-400" />
-                      <span>🎲 ALEATORIZAR CARA</span>
+                      <DiceIcon className="w-3.5 h-3.5 text-black" />
+                      <span>ALEATORIZAR CARA</span>
                     </button>
 
                     {/* Apodo */}
                     <div className="w-full flex flex-col gap-1 text-left">
-                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Apodo del Jugador:</label>
+                      <label className="text-[10px] font-mono uppercase font-bold text-slate-400">APODO DEL JUGADOR:</label>
                       <input
                         type="text"
                         value={nickname}
@@ -804,28 +738,28 @@ export function GameUI({
                         onKeyUp={(e) => e.stopPropagation()}
                         onKeyPress={(e) => e.stopPropagation()}
                         maxLength={15}
-                        className="w-full px-3 py-2 rounded-xl bg-[#0f152b] border border-[#243464] focus:border-cyan-400 focus:outline-none text-white text-xs font-bold font-mono"
+                        className="w-full px-3 py-1.5 bg-[#080c16] border border-white/15 focus:border-cyan-400 focus:outline-none text-white text-xs font-bold font-mono"
                       />
                     </div>
 
                     {/* Paleta de Color */}
                     <div className="w-full flex flex-col gap-1 text-left">
-                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Color Base / Neón:</label>
+                      <label className="text-[10px] font-mono uppercase font-bold text-slate-400">COLOR BASE // NEÓN:</label>
                       <div className="grid grid-cols-4 gap-1.5">
                         {COLOR_PALETTE.map((c) => (
                           <button
                             key={c.id}
                             onClick={() => handleSelectColor(c.hex)}
-                            className={`h-7 rounded-xl transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+                            className={`h-6 transition-all cursor-pointer flex items-center justify-center ${
                               currentColor === c.hex
-                                ? "border-2 border-white scale-105 shadow-md"
+                                ? "border-2 border-white scale-105 shadow-[0_0_8px_rgba(255,255,255,0.7)]"
                                 : "border border-white/20 opacity-70 hover:opacity-100"
                             }`}
                             style={{ backgroundColor: c.hex }}
                             title={c.name}
                           >
                             {currentColor === c.hex && (
-                              <CheckIcon className="w-3.5 h-3.5 text-white" />
+                              <CheckIcon className="w-3 h-3 text-white" />
                             )}
                           </button>
                         ))}
@@ -834,8 +768,8 @@ export function GameUI({
                   </div>
 
                   {/* Columna Derecha: Selectores de Capas Faciales */}
-                  <div className="md:col-span-7 bg-[#0a0f22] border border-[#1f2a50] p-4 sm:p-5 rounded-2xl flex flex-col justify-between gap-2.5">
-                    <div className="flex justify-between items-center pb-2 border-b border-[#182245]">
+                  <div className="md:col-span-7 bg-[#050811] border border-white/10 p-4 sm:p-5 flex flex-col justify-between gap-2">
+                    <div className="flex justify-between items-center pb-2 border-b border-white/10">
                       <span className="text-xs font-mono uppercase font-black text-white">
                         MODIFICADOR DE CAPAS
                       </span>
@@ -845,89 +779,89 @@ export function GameUI({
                     </div>
 
                     {/* 1. Casco / Base */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                    <div className="flex items-center justify-between p-2 bg-[#080c16] border border-white/10">
                       <div className="flex flex-col text-left">
-                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">1. Casco / Base</span>
+                        <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">1. CASCO / BASE</span>
                         <span className="text-xs font-bold text-white font-mono">{HEAD_NAMES[avatarConfig.head]}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleStepLayer("head", -1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronLeftIcon className="w-4 h-4" />
+                          <ChevronLeftIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleStepLayer("head", 1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronRightIcon className="w-4 h-4" />
+                          <ChevronRightIcon className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
                     {/* 2. Ojos LED */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                    <div className="flex items-center justify-between p-2 bg-[#080c16] border border-white/10">
                       <div className="flex flex-col text-left">
-                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">2. Ojos / Visor LED</span>
+                        <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">2. OJOS // VISOR LED</span>
                         <span className="text-xs font-bold text-white font-mono">{EYES_NAMES[avatarConfig.eyes]}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleStepLayer("eyes", -1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronLeftIcon className="w-4 h-4" />
+                          <ChevronLeftIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleStepLayer("eyes", 1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronRightIcon className="w-4 h-4" />
+                          <ChevronRightIcon className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
                     {/* 3. Boca / Sensor */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                    <div className="flex items-center justify-between p-2 bg-[#080c16] border border-white/10">
                       <div className="flex flex-col text-left">
-                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">3. Boca / Rejilla</span>
+                        <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">3. BOCA // REJILLA</span>
                         <span className="text-xs font-bold text-white font-mono">{MOUTH_NAMES[avatarConfig.mouth]}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleStepLayer("mouth", -1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronLeftIcon className="w-4 h-4" />
+                          <ChevronLeftIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleStepLayer("mouth", 1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronRightIcon className="w-4 h-4" />
+                          <ChevronRightIcon className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
                     {/* 4. Accesorios */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0f152b] border border-[#243464]">
+                    <div className="flex items-center justify-between p-2 bg-[#080c16] border border-white/10">
                       <div className="flex flex-col text-left">
-                        <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">4. Accesorio / Antenas</span>
+                        <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">4. ACCESORIO // ANTENAS</span>
                         <span className="text-xs font-bold text-white font-mono">{ACCESSORY_NAMES[avatarConfig.accessory]}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleStepLayer("accessory", -1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronLeftIcon className="w-4 h-4" />
+                          <ChevronLeftIcon className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleStepLayer("accessory", 1)}
-                          className="w-8 h-8 rounded-lg bg-[#141b36] hover:bg-[#1f2952] border border-[#243464] flex items-center justify-center text-slate-300 hover:text-white cursor-pointer active:scale-90"
+                          className="btn-esports-ghost w-7 h-7 flex items-center justify-center cursor-pointer"
                         >
-                          <ChevronRightIcon className="w-4 h-4" />
+                          <ChevronRightIcon className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -935,15 +869,15 @@ export function GameUI({
                 </div>
               )}
 
-              {/* Pestaña 2: Modo y Arena (Estilo Game Cards: ROULETTE / CRASH / TOWERS) */}
+              {/* Pestaña 2: Modo y Arena */}
               {activeTab === "match" && (
                 <div className="flex flex-col gap-3.5 animate-in fade-in duration-150">
                   {/* Selector de Arena */}
-                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2.5">
+                  <div className="bg-[#050811] border border-white/10 p-4 flex flex-col gap-2.5">
                     <div className="flex justify-between items-center">
-                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Seleccionar Arena:</label>
+                      <label className="text-[10px] font-mono uppercase font-bold text-slate-400">SELECCIONAR ARENA:</label>
                       {!host && (
-                        <span className="text-[10px] font-mono text-cyan-400 font-bold">CONFIGURADO POR HOST</span>
+                        <span className="text-[9px] font-mono text-cyan-400 font-bold">CONFIGURADO POR ANFITRIÓN</span>
                       )}
                     </div>
 
@@ -953,24 +887,24 @@ export function GameUI({
                           key={m.id}
                           onClick={() => handleSelectMap(m.id)}
                           disabled={!host}
-                          className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between gap-3 ${
+                          className={`p-3.5 border text-left transition-all flex flex-col justify-between gap-2.5 ${
                             mapId === m.id
-                              ? "bg-gradient-to-br from-[#122b52] to-[#0f1730] border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.4)]"
-                              : "bg-[#0f152b] border-[#1f2a50] hover:border-[#2b3a6d]"
+                              ? "bg-[#0b1428] border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.2)]"
+                              : "bg-[#080c16] border-white/10 hover:border-white/25"
                           } ${!host ? "cursor-default" : "cursor-pointer active:scale-95"}`}
                         >
                           <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#162142] text-cyan-300 border border-[#243464]">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-[#101930] text-cyan-300 border border-white/10">
                               {m.badge}
                             </span>
                             {mapId === m.id && (
-                              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+                              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff] animate-ping" />
                             )}
                           </div>
 
                           <div className="flex flex-col">
-                            <span className="text-sm font-black text-white font-mono uppercase">{m.name}</span>
-                            <span className="text-xs text-slate-400">{m.desc}</span>
+                            <span className="text-xs font-black text-white font-mono uppercase">{m.name}</span>
+                            <span className="text-[11px] text-slate-400 font-mono">{m.desc}</span>
                           </div>
                         </button>
                       ))}
@@ -978,9 +912,9 @@ export function GameUI({
                   </div>
 
                   {/* Selector de Pisos */}
-                  <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2">
+                  <div className="bg-[#050811] border border-white/10 p-4 flex flex-col gap-2">
                     <div className="flex justify-between items-center">
-                      <label className="text-[11px] font-mono uppercase font-bold text-slate-400">Niveles de Pisos:</label>
+                      <label className="text-[10px] font-mono uppercase font-bold text-slate-400">NIVELES DE PISOS:</label>
                       <span className="text-xs text-cyan-400 font-mono font-black">{floorsCount} NIVELES</span>
                     </div>
 
@@ -990,10 +924,10 @@ export function GameUI({
                           key={count}
                           onClick={() => handleSelectFloorsBtn(count)}
                           disabled={!host}
-                          className={`py-2.5 rounded-xl border text-center transition-all font-mono font-bold ${
+                          className={`py-2 border text-center transition-all font-mono font-bold ${
                             floorsCount === count
-                              ? "bg-blue-600 border-blue-400 text-white shadow-[0_0_12px_rgba(37,99,235,0.5)]"
-                              : "bg-[#0f152b] border-[#1f2a50] text-slate-400 hover:text-white"
+                              ? "bg-cyan-500 border-cyan-300 text-black shadow-[0_0_12px_rgba(0,240,255,0.4)]"
+                              : "bg-[#080c16] border-white/10 text-slate-400 hover:text-white"
                           } ${!host ? "cursor-default" : "cursor-pointer active:scale-95"}`}
                         >
                           <span className="text-xs">{count}</span>
@@ -1006,34 +940,34 @@ export function GameUI({
 
               {/* Pestaña 3: Jugadores */}
               {activeTab === "players" && (
-                <div className="bg-[#0a0f22] border border-[#1f2a50] p-4 rounded-2xl flex flex-col gap-2 max-h-60 overflow-y-auto animate-in fade-in duration-150 divide-y divide-[#182142]">
-                  <div className="flex justify-between text-[11px] font-mono uppercase font-bold text-slate-500 pb-1">
+                <div className="bg-[#050811] border border-white/10 p-4 flex flex-col gap-1.5 max-h-60 overflow-y-auto animate-in fade-in duration-150">
+                  <div className="flex justify-between text-[10px] font-mono uppercase font-bold text-slate-500 pb-1 border-b border-white/5">
                     <span>JUGADOR</span>
                     <span>PUNTAJE</span>
                   </div>
 
                   {players.map((p) => {
                     const pName = p.getState("name") || p.getProfile()?.name || "Jugador";
-                    const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#0284c7";
+                    const pColor = p.getState("color") || p.getProfile()?.color?.hex || "#00f0ff";
                     const score = p.getState("globalScore") || 0;
                     const pAvatar = p.getState("avatar") || p.getState("skin");
                     const isAfk = Boolean(p.getState("isAfk"));
 
                     return (
-                      <div key={p.id} className="flex justify-between items-center pt-2 text-xs">
-                        <div className="flex items-center gap-2.5 truncate">
-                          <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                      <div key={p.id} className="flex justify-between items-center p-2 bg-[#080c16] border border-white/5 text-xs">
+                        <div className="flex items-center gap-2 truncate">
+                          <div className="w-6 h-6 flex items-center justify-center shrink-0">
                             <CyberAvatar
                               config={pAvatar}
                               seed={pName}
                               color={pColor}
-                              size={28}
+                              size={24}
                             />
                           </div>
 
-                          <div className="flex flex-col truncate">
-                            <span className="text-xs font-bold text-white truncate">{pName}</span>
-                            <span className="text-[9px] font-mono text-slate-400 font-semibold uppercase">
+                          <div className="flex flex-col truncate text-left">
+                            <span className="text-xs font-bold text-white truncate font-mono">{pName}</span>
+                            <span className="text-[8px] font-mono text-slate-500 uppercase">
                               {isAfk ? "AFK" : "CONECTADO"}
                             </span>
                           </div>
@@ -1043,12 +977,12 @@ export function GameUI({
                           {host && localPlayer && p.id !== localPlayer.id && isAfk && (
                             <button
                               onClick={() => handleKickPlayer(p.id, pName)}
-                              className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[10px] font-bold cursor-pointer"
+                              className="px-2 py-0.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[9px] font-mono font-bold cursor-pointer"
                             >
-                              Expulsar
+                              EXPULSAR
                             </button>
                           )}
-                          <span className="text-xs font-mono font-bold text-amber-400 bg-[#141b36] px-2 py-1 rounded-lg border border-[#243464]">
+                          <span className="text-xs font-mono font-bold text-amber-400 bg-[#0c1020] px-2 py-0.5 border border-white/10 tabular-nums">
                             {score} PTS
                           </span>
                         </div>
@@ -1060,21 +994,11 @@ export function GameUI({
             </div>
           )}
 
-          {/* Barra de Control Inferior: Botón de Personalizar y Comenzar Partida */}
-          <div className="flex flex-wrap items-center justify-center gap-3 w-full">
-            <button
-              onClick={() => {
-                playStepSound();
-                setShowLobbyDrawer((prev) => !prev);
-              }}
-              className="px-5 py-3 rounded-2xl bg-[#0f152b] hover:bg-[#141b36] border border-[#243464] hover:border-cyan-400 text-xs font-bold text-slate-200 hover:text-white flex items-center gap-2 cursor-pointer transition-all shadow-md active:scale-95"
-            >
-              <SettingsIcon className="w-4 h-4 text-cyan-400" />
-              <span>{showLobbyDrawer ? "Cerrar Configuración" : "Configurar Sala & Aspecto"}</span>
-            </button>
-
-            {host ? (
-              activePlayers.length >= 2 ? (
+          {/* Barra de Control Inferior: Botón de Personalizar y Comenzar Partida (En LOBBY) */}
+          {gameStatus === "LOBBY" && (
+            <div className="flex flex-col items-center justify-center gap-2.5 w-full max-w-xs sm:max-w-sm mx-auto">
+              {/* 1. Botón Principal de Partida */}
+              {host ? (
                 <button
                   onClick={() => {
                     if (document.activeElement instanceof HTMLElement) {
@@ -1082,27 +1006,33 @@ export function GameUI({
                     }
                     onStartGame();
                   }}
-                  className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-black uppercase tracking-wider shadow-[0_0_30px_rgba(37,99,235,0.7)] border border-blue-300/50 flex items-center gap-2.5 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                  className="btn-esports-primary w-full py-3 text-xs sm:text-sm flex items-center justify-center gap-2.5 cursor-pointer shadow-[0_0_20px_rgba(0,240,255,0.35)]"
                 >
-                  <PlayIcon className="w-4 h-4 text-white" />
-                  <span>INICIAR PARTIDA</span>
+                  <PlayIcon className="w-4 h-4 fill-current" />
+                  <span>
+                    {players.length > 1 ? `INICIAR PARTIDA (${players.length} JUGADORES)` : "INICIAR PARTIDA"}
+                  </span>
                 </button>
               ) : (
-                <button
-                  disabled
-                  className="px-6 py-3.5 rounded-2xl text-xs font-bold text-slate-500 bg-[#0f152b] border border-[#1f2a50] flex items-center gap-2 cursor-not-allowed font-mono"
-                  title="Se requieren al menos 2 jugadores activos"
-                >
-                  <span>MÍNIMO 2 JUGADORES ({activePlayers.length}/2)</span>
-                </button>
-              )
-            ) : (
-              <div className="px-5 py-3 rounded-2xl bg-[#0f152b] border border-[#243464] text-cyan-300 text-xs font-mono font-bold flex items-center gap-2 shadow-md">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span>ESPERANDO QUE EL ANFITRIÓN INICIE...</span>
-              </div>
-            )}
-          </div>
+                <div className="w-full py-2.5 bg-[#070a14] border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold flex items-center justify-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span>ESPERANDO QUE EL ANFITRIÓN INICIE...</span>
+                </div>
+              )}
+
+              {/* 2. Botón Secundario de Taller */}
+              <button
+                onClick={() => {
+                  playStepSound();
+                  setShowLobbyDrawer((prev) => !prev);
+                }}
+                className="btn-esports-ghost w-full py-2.5 text-xs font-mono flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <SettingsIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{showLobbyDrawer ? "CERRAR TALLER" : "CONFIGURAR SALA // TALLER"}</span>
+              </button>
+            </div>
+          )}
         </footer>
       )}
 
@@ -1117,3 +1047,4 @@ export function GameUI({
 }
 
 export default GameUI;
+

@@ -1,6 +1,7 @@
 let audioCtx: AudioContext | null = null;
 let globalVolume = 0.5; // Default volume is 50%
 import tileBreakAudioUrl from "./baldosa_cae.mp3";
+import { setBgmVolume } from "./bgm";
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -14,6 +15,7 @@ function getAudioContext() {
 
 export function setGlobalVolume(val: number) {
   globalVolume = Math.max(0, Math.min(1, val));
+  setBgmVolume(globalVolume);
 }
 
 export function getGlobalVolume() {
